@@ -1,0 +1,73 @@
+# requests.http — manual API collection, one request per endpoint, in the
+# order a learner meets them. Every task that adds an endpoint adds its
+# request here in the same change.
+#
+# Written for the VS Code REST Client extension (humao.rest-client). The
+# bearer token is captured from the verify response into @token, so it is
+# never copied by hand.
+#
+# Before you start:
+#   npm run seed   two known learners; learner.one is partway through mission 1
+#   npm run dev    with EMAIL_MODE unset, so codes print in this terminal
+#
+# Then run top to bottom. After "Request a code", copy the 6-digit code from
+# the `npm run dev` terminal into @otp, then run "Verify the code".
+
+@baseUrl = http://localhost:3000/api
+@email = learner.one@example.test
+@otp = 000000
+@token = {{verify.response.headers.set-auth-token}}
+
+###
+# Health check. No sign-in needed.
+# Good: 200 {"status":"ok","uptimeSeconds":…,"database":"ok"}.
+# 503 SERVICE_UNAVAILABLE means the database cannot be reached.
+GET {{baseUrl}}/health
+
+###
+# Sign in, step 1 — request a one-time code for @email.
+# Good: 200 {"success":true}, and the code appears in the dev server terminal
+# (EMAIL_MODE=console). Limited to 3 per email and 20 per IP every 15 minutes.
+POST {{baseUrl}}/auth/otp/request
+Content-Type: application/json
+
+{ "email": "{{email}}" }
+
+###
+# Sign in, step 2 — verify the code in @otp. Creates the learner and an empty
+# profile on first sign-in; seeded learners sign in to their existing account.
+# Good: 200 {"token":"…"} with the same token in the set-auth-token header,
+# which fills @token. A wrong code is 400 INVALID_CODE; the fourth wrong try is
+# INVALID_CODE_LAST_ATTEMPT and the fifth locks the code (TOO_MANY_ATTEMPTS).
+# Each code works once.
+# @name verify
+POST {{baseUrl}}/auth/otp/verify
+Content-Type: application/json
+
+{ "email": "{{email}}", "otp": "{{otp}}" }
+
+###
+# The signed-in learner and their profile in one response. Stamps last_seen_at.
+# Good: 200 {"learner":{"id","email","createdAt"},"profile":{"detectiveName",
+# "avatarId","soundOn","lastSeenAt"}}. For learner.one: Detective Asha, female-1.
+GET {{baseUrl}}/me
+Authorization: Bearer {{token}}
+
+###
+# The same call without a token.
+# Good: 401 {"status":401,"code":"UNAUTHENTICATED",…,"requestId":"…"}.
+GET {{baseUrl}}/me
+
+###
+# Sign out this device. Deletes this session only; other devices stay signed in.
+# Good: 200 {"success":true}. Also 200 with no token or one already signed out.
+POST {{baseUrl}}/auth/signout
+Authorization: Bearer {{token}}
+
+###
+# The signed-out token again.
+# Good: 401 UNAUTHENTICATED, even though the token string is unchanged.
+GET {{baseUrl}}/me
+Authorization: Bearer {{token}}
+
+###

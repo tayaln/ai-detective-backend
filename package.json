@@ -1,0 +1,50 @@
+{
+  "name": "ai-detective-backend",
+  "version": "0.1.0",
+  "private": true,
+  "description": "API for AI Detective, a story-driven app that teaches learners to build an AI agent.",
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "dev": "node --watch --env-file-if-exists=.env src/index.ts",
+    "build": "tsc",
+    "start": "node --env-file-if-exists=.env dist/index.js",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p test",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "postinstall": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:studio": "prisma studio",
+    "seed": "node --env-file-if-exists=.env src/scripts/seed.ts",
+    "test": "node --env-file-if-exists=.env --import ./test/setup.ts --test \"test/**/*.test.ts\""
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/node": "^24.19.2",
+    "auth": "^1.7.7",
+    "eslint": "^10.12.0",
+    "eslint-config-prettier": "^10.1.8",
+    "prettier": "^3.9.10",
+    "prisma": "^7.10.0",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.71.1"
+  },
+  "dependencies": {
+    "@prisma/adapter-pg": "^7.10.0",
+    "@prisma/client": "^7.10.0",
+    "better-auth": "^1.7.7",
+    "cors": "^2.8.6",
+    "express": "^5.3.0",
+    "express-rate-limit": "^8.7.1",
+    "helmet": "^8.3.0",
+    "pino": "^10.4.0",
+    "pino-roll": "^4.0.0",
+    "zod": "^4.6.6"
+  }
+}
