@@ -37,11 +37,10 @@ export function feedbackEmail(notice: FeedbackNotice): OutgoingEmail {
   return {
     to: notice.to,
     replyTo: notice.learnerEmail,
-    subject: `Feedback: ${mission} — ${step}`,
+    subject: `AI Detective Application Feedback: ${mission} — ${step}`,
     text: [
       'New chapter feedback from AI Detective.',
       '',
-      `Detective: ${notice.detectiveName ? oneLine(notice.detectiveName) : '(no detective name yet)'}`,
       `Email:     ${notice.learnerEmail}`,
       `Mission:   ${mission} (${notice.courseId})`,
       `Chapter:   ${step} (${notice.stepId})`,

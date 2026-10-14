@@ -28,11 +28,9 @@ export function syncAttemptToSheet(attempt: SavedAttempt): void {
   void (async () => {
     try {
       const learner = await findLearnerContact(attempt.learnerId);
-      const email = learner?.email ?? attempt.learnerId;
-      const name = learner?.profile?.detectiveName;
       await appendSheetRow({
         timestamp: formatIst(attempt.createdAt),
-        learner: name ? `${name} (${email})` : email,
+        learner: learner?.email ?? attempt.learnerId,
         mission: attempt.courseId,
         step: attempt.stepId,
         type: attempt.stepType,

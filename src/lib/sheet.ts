@@ -6,6 +6,7 @@ import { logger } from './logger.ts';
 export interface SheetRow {
   /** IST, formatted text; the sheet never converts it. */
   timestamp: string;
+  /** The learner's email address. */
   learner: string;
   mission: string;
   step: string;

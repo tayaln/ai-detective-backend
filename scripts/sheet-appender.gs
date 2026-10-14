@@ -20,7 +20,7 @@
 var SHEET_NAME = 'Attempts';
 var HEADERS = [
   'Timestamp (IST)',
-  'Learner',
+  'Learner Email',
   'Mission',
   'Step',
   'Type',
