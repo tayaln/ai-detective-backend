@@ -22,6 +22,10 @@
     "seed": "node --env-file-if-exists=.env src/scripts/seed.ts",
     "test": "node --env-file-if-exists=.env --import ./test/setup.ts --test \"test/**/*.test.ts\""
   },
+  "overrides": {
+    "deepmerge-ts": "8.0.2",
+    "mysql2": "3.24.6"
+  },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@types/cors": "^2.8.19",
