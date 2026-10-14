@@ -6,7 +6,12 @@ export interface OutgoingEmail {
   to: string;
   subject: string;
   text: string;
+  /** Where a reply goes, when it should not go back to the sender account. */
+  replyTo?: string;
 }
+
+/** "sent" only when Brevo accepted it; "console" when EMAIL_MODE kept it local. */
+export type EmailOutcome = 'sent' | 'console';
 
 const BREVO_SEND_URL = 'https://api.brevo.com/v3/smtp/email';
 const SEND_TIMEOUT_MS = 10_000;
@@ -45,23 +50,25 @@ export function assertEmailCapacity(): void {
  * production the email is printed to the terminal, never to the log file.
  * Both modes count towards the daily cap, so it behaves the same everywhere.
  */
-export async function sendEmail(email: OutgoingEmail): Promise<void> {
+export async function sendEmail(email: OutgoingEmail): Promise<EmailOutcome> {
   assertEmailCapacity();
   dailyCount.sent += 1;
 
   if (config.EMAIL_MODE === 'live') {
     await sendWithBrevo(email);
     logger.info('Email sent through Brevo');
-    return;
+    return 'sent';
   }
 
   logger.info('Email not sent: EMAIL_MODE is console');
   if (config.NODE_ENV !== 'production') {
     // The one place a sign-in code may appear, and only on the terminal.
+    const replyTo = email.replyTo ? `\nReply-To: ${email.replyTo}` : '';
     process.stdout.write(
-      `\n[email:console] To: ${email.to}\nSubject: ${email.subject}\n\n${email.text}\n\n`,
+      `\n[email:console] To: ${email.to}${replyTo}\nSubject: ${email.subject}\n\n${email.text}\n\n`,
     );
   }
+  return 'console';
 }
 
 async function sendWithBrevo(email: OutgoingEmail): Promise<void> {
@@ -81,6 +88,7 @@ async function sendWithBrevo(email: OutgoingEmail): Promise<void> {
     body: JSON.stringify({
       sender: { email: BREVO_SENDER_EMAIL, name: BREVO_SENDER_NAME },
       to: [{ email: email.to }],
+      ...(email.replyTo && { replyTo: { email: email.replyTo } }),
       subject: email.subject,
       textContent: email.text,
     }),

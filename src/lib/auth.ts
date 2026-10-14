@@ -30,7 +30,7 @@ export const auth = betterAuth({
       create: {
         // Every learner has a profile row from the moment they exist.
         after: async (user) => {
-          await createEmptyProfile(user.id);
+          await createEmptyProfile(user.id, user.email);
         },
       },
     },

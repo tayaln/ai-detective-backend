@@ -8,6 +8,6 @@ export async function getMe(learnerId: string) {
   if (!learner) {
     throw new AppError(401, 'UNAUTHENTICATED', 'Sign in to continue.');
   }
-  const profile = await touchProfile(learnerId);
+  const profile = await touchProfile(learnerId, learner.email);
   return { learner, profile };
 }

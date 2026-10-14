@@ -21,21 +21,21 @@ datasource db {
 // ---------------------------------------------------------------------------
 
 model User {
-  id             String           @id
-  name           String
-  email          String
-  emailVerified  Boolean          @default(false)
-  image          String?
-  createdAt      DateTime         @default(now()) @db.Timestamptz(3)
-  updatedAt      DateTime         @updatedAt @db.Timestamptz(3)
-  sessions       Session[]
-  accounts       Account[]
+  id              String                 @id
+  name            String
+  email           String
+  emailVerified   Boolean                @default(false)
+  image           String?
+  createdAt       DateTime               @default(now()) @db.Timestamptz(3)
+  updatedAt       DateTime               @updatedAt @db.Timestamptz(3)
+  sessions        Session[]
+  accounts        Account[]
   // Back-relations to the application models; no columns on the user table.
-  profile        Profile?
-  courseProgress CourseProgress[]
-  attempts       Attempt[]
-  feedback       Feedback[]
-  saralMessages  SaralMessage[]
+  profile         Profile?
+  stepCompletions CourseStepCompletion[]
+  attempts        Attempt[]
+  feedback        Feedback[]
+  saralMessages   SaralMessage[]
 
   @@unique([email])
   @@map("user")
@@ -96,6 +96,9 @@ model Verification {
 
 model Profile {
   learnerId     String    @id @map("learner_id")
+  // A copy of user.email so profiles read on their own in a database client.
+  // The user table stays the source; every profile write copies it across.
+  email         String
   detectiveName String?   @map("detective_name")
   avatarId      String?   @map("avatar_id")
   soundOn       Boolean   @default(true) @map("sound_on")
@@ -106,16 +109,18 @@ model Profile {
   @@map("profiles")
 }
 
-model CourseProgress {
-  learnerId     String    @map("learner_id")
-  courseId      String    @map("course_id")
-  currentStepId String    @map("current_step_id")
-  startedAt     DateTime  @default(now()) @map("started_at") @db.Timestamptz(3)
-  completedAt   DateTime? @map("completed_at") @db.Timestamptz(3)
-  learner       User      @relation(fields: [learnerId], references: [id], onDelete: Cascade)
+// One row per step the learner has moved forward from. The row's existence is
+// the fact that the step is complete; there is no row for a step only opened.
+// Position and mission state are derived from these rows, never stored.
+model CourseStepCompletion {
+  learnerId   String   @map("learner_id")
+  courseId    String   @map("course_id")
+  stepId      String   @map("step_id")
+  completedAt DateTime @default(now()) @map("completed_at") @db.Timestamptz(3)
+  learner     User     @relation(fields: [learnerId], references: [id], onDelete: Cascade)
 
-  @@id([learnerId, courseId])
-  @@map("course_progress")
+  @@id([learnerId, courseId, stepId])
+  @@map("course_step_completions")
 }
 
 model Attempt {

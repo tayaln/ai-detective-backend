@@ -34,12 +34,24 @@ const envSchema = z
     BREVO_SENDER_NAME: z.string().optional(),
     // Brevo's free plan allows 300 emails a day, shared with production.
     BREVO_DAILY_CAP: z.coerce.number().int().positive().default(300),
+    // Where chapter feedback notifications go.
+    FEEDBACK_RECIPIENT_EMAIL: z.email().optional(),
+    // The Apps Script web app that appends attempt rows. A credential: whoever
+    // holds it can write to the client's sheet. Unset means no sync.
+    GOOGLE_SCRIPT_URL: z.url({ protocol: /^https$/ }).optional(),
+    // The sheet itself, for people and log lines only. Never used to write.
+    GOOGLE_SHEET_URL: z.url({ protocol: /^https$/ }).optional(),
   })
   .superRefine((env, ctx) => {
     if (env.EMAIL_MODE !== 'live') {
       return;
     }
-    for (const key of ['BREVO_API_KEY', 'BREVO_SENDER_EMAIL', 'BREVO_SENDER_NAME'] as const) {
+    for (const key of [
+      'BREVO_API_KEY',
+      'BREVO_SENDER_EMAIL',
+      'BREVO_SENDER_NAME',
+      'FEEDBACK_RECIPIENT_EMAIL',
+    ] as const) {
       if (env[key] === undefined) {
         ctx.addIssue({ code: 'custom', path: [key], message: 'is required when EMAIL_MODE=live' });
       }
@@ -75,3 +87,6 @@ function loadConfig(): Config {
 }
 
 export const config = loadConfig();
+
+/** Preset avatar ids shipped with the frontend; any other id is rejected. */
+export const PRESET_AVATAR_IDS = ['male-1', 'male-2', 'female-1', 'female-2'] as const;
