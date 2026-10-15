@@ -143,27 +143,42 @@ Content-Type: application/json
 { "soundOn": false }
 
 ###
-# Every completion this learner has, grouped by mission — facts only, no
-# started/finished verdict and no resume step; the frontend derives those.
-# Good: 200 {"courses":[{"courseId":"search-agent","completions":[{"stepId":…,
-# "completedAt":…}]}]}. A mission with no completions is absent. For the seeded
-# learner.one: 6 search-agent steps through sa-ch-4-give-the-ai-a-task.
+# Progress for every mission in the content, worked out on the server: status,
+# resume step, the steps that may be opened by URL, chapter counts and per-chapter states.
+# Good: 200 {"courses":[{"courseId":"search-agent","status":"in-progress",
+# "resumeStepId":"sa-ch-4-give-the-ai-a-task","reachableStepIds":[…through "sa-quiz-1"],
+# "completedChapters":4,"totalChapters":12,"chapters":[{"stepId":…,"state":
+# "complete"|"current"|"empty"}],"completedStepIds":[…]}, …]}. Missions never
+# started are included as "not-started". Values shown are for seeded learner.one.
 GET {{baseUrl}}/progress
 Authorization: Bearer {{token}}
 
 ###
-# One mission's completions, in the order they happened.
-# Good: 200 {"courseId":"search-agent","completions":[…]}. A mission never
-# started is 200 with an empty list, not a 404.
+# One mission's progress, the same shape as one entry above.
+# Good: 200 {"courseId":"search-agent","status":…,"resumeStepId":…}. A mission
+# never started is 200 with status "not-started", not a 404.
 GET {{baseUrl}}/progress/search-agent
+Authorization: Bearer {{token}}
+
+###
+# A mission that is not in the content.
+# Good: 404 NOT_FOUND.
+GET {{baseUrl}}/progress/no-such-mission
 Authorization: Bearer {{token}}
 
 ###
 # Mark a step complete as the learner moves forward (and on reaching the
 # ending). No body. Set once: send it twice and the second call still succeeds
-# but leaves the original completedAt unchanged. Step ids are stored as sent.
-# Good: 200 {"success":true}. An id over 100 characters is 400 INVALID_INPUT.
+# but leaves the original completedAt unchanged.
+# Good: 200 with the mission's progress after the completion, the same shape as
+# GET /progress/:courseId. An id over 100 characters is 400 INVALID_INPUT.
 PUT {{baseUrl}}/progress/search-agent/steps/sa-quiz-1
+Authorization: Bearer {{token}}
+
+###
+# A step that is not in that mission's content. Nothing is stored.
+# Good: 404 NOT_FOUND.
+PUT {{baseUrl}}/progress/search-agent/steps/no-such-step
 Authorization: Bearer {{token}}
 
 ###

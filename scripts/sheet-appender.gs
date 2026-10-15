@@ -59,12 +59,23 @@ function doPost(e) {
   var lock = LockService.getScriptLock();
   lock.waitLock(20000);
   try {
+    // The backend retries when a reply is lost, but the first request may
+    // still have written the row. Each attempt id is written once; the cache
+    // keeps ids for 6 hours, far longer than the retry window.
+    var cache = CacheService.getScriptCache();
+    var cacheKey = data.attemptId ? 'attempt:' + data.attemptId : null;
+    if (cacheKey && cache.get(cacheKey)) {
+      return reply({ ok: true });
+    }
     var sheet = attemptsSheet();
     var range = sheet.getRange(sheet.getLastRow() + 1, 1, 1, row.length);
     // Plain text, so a learner's code or name starting with "=" is never run
     // as a formula and every value lands exactly as sent.
     range.setNumberFormat('@');
     range.setValues([row]);
+    if (cacheKey) {
+      cache.put(cacheKey, '1', 21600);
+    }
   } finally {
     lock.releaseLock();
   }

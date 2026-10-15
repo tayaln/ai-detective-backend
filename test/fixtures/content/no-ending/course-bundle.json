@@ -1,0 +1,8 @@
+{
+  "id": "no-ending",
+  "title": "Mission without an ending (test fixture)",
+  "steps": [
+    { "id": "ne-briefing", "type": "briefing" },
+    { "id": "ne-ch-1", "type": "chapter" }
+  ]
+}

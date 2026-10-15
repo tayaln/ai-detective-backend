@@ -34,6 +34,9 @@ const envSchema = z
     BREVO_SENDER_NAME: z.string().optional(),
     // Brevo's free plan allows 300 emails a day, shared with production.
     BREVO_DAILY_CAP: z.coerce.number().int().positive().default(300),
+    // Directory holding one <courseId>/course-bundle.json per mission, emitted
+    // by the frontend build. Progress is worked out against it.
+    CONTENT_BUNDLE_PATH: z.string(),
     // Where chapter feedback notifications go.
     FEEDBACK_RECIPIENT_EMAIL: z.email().optional(),
     // The Apps Script web app that appends attempt rows. A credential: whoever

@@ -4,6 +4,11 @@ import { logger } from './logger.ts';
 
 /** One attempt as it lands in the client's sheet, in column order. */
 export interface SheetRow {
+  /**
+   * The attempt's row id. Not a column: the script uses it to skip a row it
+   * has already written, so a retry after a lost reply adds no duplicate.
+   */
+  attemptId: string;
   /** IST, formatted text; the sheet never converts it. */
   timestamp: string;
   /** The learner's email address. */
@@ -17,7 +22,9 @@ export interface SheetRow {
   submittedAnswer: string;
 }
 
-const REQUEST_TIMEOUT_MS = 10_000;
+// Longer than the script's 20s lock wait plus a cold start. Giving up sooner
+// does not stop the script, which then writes the row the retry writes again.
+const REQUEST_TIMEOUT_MS = 30_000;
 /** Waits before the second and third tries. */
 const RETRY_DELAYS_MS = [1_000, 3_000];
 
@@ -43,6 +50,9 @@ export async function appendSheetRow(row: SheetRow): Promise<void> {
     reason = await tryAppend(url, row);
     if (!reason) {
       return;
+    }
+    if (attempt < RETRY_DELAYS_MS.length) {
+      logger.warn({ attemptId: row.attemptId, reason }, 'Sheet append try failed; retrying');
     }
   }
   throw new Error(`Sheet append failed after ${RETRY_DELAYS_MS.length + 1} tries: ${reason}`);

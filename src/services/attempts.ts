@@ -29,6 +29,7 @@ export function syncAttemptToSheet(attempt: SavedAttempt): void {
     try {
       const learner = await findLearnerContact(attempt.learnerId);
       await appendSheetRow({
+        attemptId: String(attempt.id),
         timestamp: formatIst(attempt.createdAt),
         learner: learner?.email ?? attempt.learnerId,
         mission: attempt.courseId,

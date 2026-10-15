@@ -1,18 +1,34 @@
 import { prisma } from './client.ts';
 
 /**
- * Records that the learner completed a step: one INSERT ... ON CONFLICT DO
- * NOTHING. The first call creates the row; a repeat leaves the original
- * completed_at untouched. No read beforehand.
+ * Records that the learner moved on from a step, in one transaction:
+ * - the completion: INSERT ... ON CONFLICT DO NOTHING, so the first call
+ *   creates the row and a repeat leaves the original completed_at untouched
+ * - the position: the mission's last step moved on from, overwritten every time
  */
 export async function markStepCompleted(
   learnerId: string,
   courseId: string,
   stepId: string,
 ): Promise<void> {
-  await prisma.courseStepCompletion.createMany({
-    data: [{ learnerId, courseId, stepId }],
-    skipDuplicates: true,
+  await prisma.$transaction([
+    prisma.courseStepCompletion.createMany({
+      data: [{ learnerId, courseId, stepId }],
+      skipDuplicates: true,
+    }),
+    prisma.coursePosition.upsert({
+      where: { learnerId_courseId: { learnerId, courseId } },
+      create: { learnerId, courseId, stepId },
+      update: { stepId },
+    }),
+  ]);
+}
+
+/** The last step moved on from in each mission, optionally for one course. */
+export function findPositions(learnerId: string, courseId?: string) {
+  return prisma.coursePosition.findMany({
+    where: { learnerId, ...(courseId !== undefined && { courseId }) },
+    select: { courseId: true, stepId: true },
   });
 }
 
