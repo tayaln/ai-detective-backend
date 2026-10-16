@@ -1,5 +1,5 @@
 import type { OutgoingEmail } from './email.ts';
-import { formatIst } from './time.ts';
+import { formatIstShort } from './time.ts';
 
 export interface FeedbackNotice {
   to: string;
@@ -21,37 +21,46 @@ function oneLine(text: string): string {
   return text.replace(/\s+/g, ' ').trim();
 }
 
+/** Lines up the values of the details block: "Submitted:  " is the longest label. */
+function detail(label: string, value: string): string {
+  return `${`${label}:`.padEnd(12)}${value}`;
+}
+
 /**
  * Plain text only, so nothing in the message is ever interpreted as markup.
- * The subject names the mission and chapter so a full inbox stays scannable,
- * and replies go straight to the learner.
+ * The subject names the mission and chapter so a full inbox stays scannable;
+ * the learner's words come first, the details under a rule, and replies go
+ * straight to the learner.
  */
 export function feedbackEmail(notice: FeedbackNotice): OutgoingEmail {
-  const mission = `Mission ${notice.missionNumber} · ${oneLine(notice.missionTitle)}`;
+  const missionTitle = oneLine(notice.missionTitle);
   const stepTitle = notice.stepTitle ? oneLine(notice.stepTitle) : null;
-  const step =
+  const stepName = stepTitle ?? notice.stepId;
+  const chapter =
     notice.chapterNumber === null
-      ? (stepTitle ?? notice.stepId)
+      ? stepName
       : `Chapter ${notice.chapterNumber}${stepTitle ? ` · ${stepTitle}` : ''}`;
+  // "Mission 1 Ch2 — Read the AI's Response"; a step that is not a chapter has no "ChN".
+  const subjectStep =
+    notice.chapterNumber === null
+      ? `Mission ${notice.missionNumber} — ${stepName}`
+      : `Mission ${notice.missionNumber} Ch${notice.chapterNumber} — ${stepName}`;
+  const name = notice.detectiveName ? oneLine(notice.detectiveName) : null;
 
   return {
     to: notice.to,
     replyTo: notice.learnerEmail,
-    subject: `AI Detective Application Feedback: ${mission} — ${step}`,
+    subject: `Feedback · ${subjectStep}`,
     text: [
-      'New chapter feedback from AI Detective.',
+      `Feedback: ${notice.message}`,
       '',
-      `Email:     ${notice.learnerEmail}`,
-      `Mission:   ${mission} (${notice.courseId})`,
-      `Chapter:   ${step} (${notice.stepId})`,
-      `Page:      ${oneLine(notice.pageUrl)}`,
-      `Received:  ${formatIst(notice.receivedAt)}`,
+      '———',
+      detail('Learner', name ? `${name} (${notice.learnerEmail})` : notice.learnerEmail),
+      detail('Mission', `Mission ${notice.missionNumber} · ${missionTitle} (${notice.courseId})`),
+      detail('Chapter', `${chapter} (${notice.stepId})`),
+      detail('Submitted', formatIstShort(notice.receivedAt)),
+      detail('Page', oneLine(notice.pageUrl)),
       '',
-      'Message:',
-      '',
-      notice.message,
-      '',
-      '—',
       'Reply to this email to answer the learner directly.',
     ].join('\n'),
   };

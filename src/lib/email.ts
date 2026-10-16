@@ -6,6 +6,12 @@ export interface OutgoingEmail {
   to: string;
   subject: string;
   text: string;
+  /**
+   * The HTML body, when the email needs formatting. Brevo takes one body type per
+   * request, so with `html` it sends only the HTML; `text` is still what console mode
+   * prints.
+   */
+  html?: string;
   /** Where a reply goes, when it should not go back to the sender account. */
   replyTo?: string;
 }
@@ -90,7 +96,7 @@ async function sendWithBrevo(email: OutgoingEmail): Promise<void> {
       to: [{ email: email.to }],
       ...(email.replyTo && { replyTo: { email: email.replyTo } }),
       subject: email.subject,
-      textContent: email.text,
+      ...(email.html ? { htmlContent: email.html } : { textContent: email.text }),
     }),
     signal: AbortSignal.timeout(SEND_TIMEOUT_MS),
   });
