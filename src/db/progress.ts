@@ -1,10 +1,11 @@
 import { prisma } from './client.ts';
 
 /**
- * Records that the learner moved on from a step, in one transaction:
+ * Records that the learner completed a step (moved on from it, answered a chapter
+ * correctly, or submitted a quiz), in one transaction:
  * - the completion: INSERT ... ON CONFLICT DO NOTHING, so the first call
  *   creates the row and a repeat leaves the original completed_at untouched
- * - the position: the mission's last step moved on from, overwritten every time
+ * - the position: the mission's last step completed, overwritten every time
  */
 export async function markStepCompleted(
   learnerId: string,

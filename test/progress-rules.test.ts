@@ -66,9 +66,10 @@ describe('progress rules', () => {
     assert.equal(states(completed), 'complete,current,empty');
   });
 
-  test('when the next step is a quiz, the learner resumes at its lead-in', () => {
+  test('an unsubmitted quiz reopens at the quiz; a submitted one at the step after', () => {
     const completed = upTo('quiz-1');
-    assert.equal(resolveResumeStep(STEPS, completed), 'ch-2');
+    assert.equal(resolveResumeStep(STEPS, completed), 'quiz-1');
+    assert.equal(resolveResumeStep(STEPS, [...completed, 'quiz-1']), 'ch-3');
     // The quiz itself can still be opened by URL.
     assert.equal(reachableSteps(STEPS, completed).at(-1), 'quiz-1');
     assert.equal(states(completed), 'complete,complete,current');
@@ -90,8 +91,9 @@ describe('progress rules', () => {
     // Replaying, moved on from the briefing and chapter 1: the story after it.
     assert.equal(resolveResumeStep(STEPS, all, 'ch-1'), 'story-1');
     assert.equal(resolveResumeStep(STEPS, all, 'story-1'), 'ch-2');
-    // A quiz next: its lead-in, as on a first run.
-    assert.equal(resolveResumeStep(STEPS, all, 'ch-2'), 'ch-2');
+    // A quiz next: the quiz itself, as on a first run.
+    assert.equal(resolveResumeStep(STEPS, all, 'ch-2'), 'quiz-1');
+    assert.equal(resolveResumeStep(STEPS, all, 'quiz-1'), 'ch-3');
     // Still complete throughout: completions are never removed.
     assert.equal(missionState(STEPS, all), 'complete');
   });

@@ -35,13 +35,12 @@ function endingStep(steps: readonly StepRef[]): StepRef | undefined {
  * Where a learner lands when they open a mission:
  * - the ending is complete (a finished mission, being replayed or not): the step
  *   after `lastStepId`, the last step the learner moved on from, so a replay picks
- *   up where it was left (its lead-in when that step is a quiz). When the last step
- *   moved on from is the ending, or there is none, the first step (the briefing),
+ *   up where it was left. When the last step completed is the ending, or there is none, the first step (the briefing),
  *   so a finished mission reopens from the start. It stays complete either way,
  *   since completions are never removed
- * - otherwise the first step, in content order, with no completion
- * - but when that step is a quiz, the step before it, so the learner re-enters
- *   the quiz through its lead-in
+ * - otherwise the first step, in content order, with no completion. A quiz counts
+ *   as completed once submitted, so an unsubmitted quiz reopens at the quiz itself
+ *   and a submitted one at the step after it
  * - every step complete but no ending: the last step
  *
  * `steps` must be non-empty; the content loader guarantees it.
@@ -57,18 +56,15 @@ export function resolveResumeStep(
 
   const index = steps.findIndex((step) => !completed.has(step.id));
   const next = steps[index];
-  if (!next) return lastStep(steps).id;
-  const leadIn = steps[index - 1];
-  if (next.type === 'quiz' && leadIn) return leadIn.id;
-  return next.id;
+  return next ? next.id : lastStep(steps).id;
 }
 
-/** Where a finished mission resumes: after the last step moved on from (see above). */
+/** Where a finished mission resumes: after the last step completed (see above). */
 function replayStep(steps: readonly StepRef[], ending: StepRef, lastStepId?: string): string {
   const index = steps.findIndex((step) => step.id === lastStepId);
   const next = steps[index + 1];
   if (index === -1 || lastStepId === ending.id || !next) return firstStep(steps).id;
-  return next.type === 'quiz' ? (steps[index]?.id ?? next.id) : next.id;
+  return next.id;
 }
 
 function firstStep(steps: readonly StepRef[]): StepRef {

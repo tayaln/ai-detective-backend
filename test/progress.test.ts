@@ -127,13 +127,13 @@ describe('progress endpoints', () => {
     assert.deepEqual((await call('GET', '/progress/demo', token)).body, reply.body);
   });
 
-  test('a quiz next means resuming at the step before it', async () => {
+  test('an unsubmitted quiz is where the learner resumes; a submitted one is passed', async () => {
     const { token } = await newLearner('quiz');
     for (const step of ['demo-briefing', 'demo-ch-1', 'demo-story-1', 'demo-ch-2']) {
       await call('PUT', `/progress/demo/steps/${step}`, token);
     }
     const reply = await call('GET', '/progress/demo', token);
-    assert.equal(reply.body.resumeStepId, 'demo-ch-2');
+    assert.equal(reply.body.resumeStepId, 'demo-quiz-1');
     assert.deepEqual(reply.body.reachableStepIds, [
       'demo-briefing',
       'demo-ch-1',
@@ -141,6 +141,8 @@ describe('progress endpoints', () => {
       'demo-ch-2',
       'demo-quiz-1',
     ]);
+    const submitted = await call('PUT', '/progress/demo/steps/demo-quiz-1', token);
+    assert.equal(submitted.body.resumeStepId, 'demo-ch-3');
   });
 
   test('reaching the ending completes the mission', async () => {
@@ -205,6 +207,13 @@ describe('progress endpoints', () => {
     assert.equal(again.status, 200);
     const second = await prisma.courseStepCompletion.findUniqueOrThrow({ where });
     assert.equal(second.completedAt.getTime(), first.completedAt.getTime());
+    assert.equal(second.createdAt.getTime(), first.createdAt.getTime());
+    assert.equal(second.updatedAt.getTime(), first.updatedAt.getTime());
+    // The position row is overwritten, keeping when it was first made.
+    const position = await prisma.coursePosition.findUniqueOrThrow({
+      where: { learnerId_courseId: { learnerId: id, courseId: 'demo' } },
+    });
+    assert.ok(position.updatedAt.getTime() >= position.createdAt.getTime());
   });
 
   test('an unknown mission or step is 404, and nothing is stored', async () => {

@@ -256,6 +256,7 @@ No passwords are stored, since sign-in uses a one-time code sent to email.
 | avatar_id | text | Preset avatar |
 | sound_on | boolean | Celebration sound preference |
 | last_seen_at | timestamptz | Updated when the application is opened |
+| created_at | timestamptz | |
 | updated_at | timestamptz | |
 
 #### course_step_completions
@@ -264,8 +265,10 @@ No passwords are stored, since sign-in uses a one-time code sent to email.
 |---|---|---|
 | learner_id | text | Part of the primary key; references user |
 | course_id | text | Part of the primary key; matches the content files |
-| step_id | text | Part of the primary key; the step the learner moved on from (or the ending, on reaching it) |
+| step_id | text | Part of the primary key; the step completed: moved on from, a chapter answered correctly, a quiz submitted, or the ending reached |
 | completed_at | timestamptz | Set once, on the first completion; a replay never changes it |
+| created_at | timestamptz | |
+| updated_at | timestamptz | A repeat completion leaves the row untouched, so this matches created_at |
 
 #### course_positions
 
@@ -273,7 +276,8 @@ No passwords are stored, since sign-in uses a one-time code sent to email.
 |---|---|---|
 | learner_id | text | Part of the primary key; references user |
 | course_id | text | Part of the primary key; matches the content files |
-| step_id | text | The last step the learner moved on from, overwritten on every move. Lets a replay of a finished mission resume where it was left |
+| step_id | text | The last step the learner completed, overwritten on every completion. Lets a replay of a finished mission resume where it was left |
+| created_at | timestamptz | |
 | updated_at | timestamptz | |
 
 Mission status, the resume step, the steps that may be opened by URL and chapter

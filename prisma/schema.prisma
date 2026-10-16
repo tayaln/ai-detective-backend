@@ -104,6 +104,7 @@ model Profile {
   avatarId      String?   @map("avatar_id")
   soundOn       Boolean   @default(true) @map("sound_on")
   lastSeenAt    DateTime? @map("last_seen_at") @db.Timestamptz(3)
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt     DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
   learner       User      @relation(fields: [learnerId], references: [id], onDelete: Cascade)
 
@@ -118,6 +119,8 @@ model CourseStepCompletion {
   courseId    String   @map("course_id")
   stepId      String   @map("step_id")
   completedAt DateTime @default(now()) @map("completed_at") @db.Timestamptz(3)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
   learner     User     @relation(fields: [learnerId], references: [id], onDelete: Cascade)
 
   @@id([learnerId, courseId, stepId])
@@ -131,6 +134,7 @@ model CoursePosition {
   learnerId String   @map("learner_id")
   courseId  String   @map("course_id")
   stepId    String   @map("step_id")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
   learner   User     @relation(fields: [learnerId], references: [id], onDelete: Cascade)
 
