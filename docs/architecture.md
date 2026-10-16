@@ -80,7 +80,7 @@ updated independently.
 | Code editor | Monaco Editor |
 | Styling | Tailwind CSS with shadcn/ui |
 | Frontend libraries | React Router, TanStack Query, Zod |
-| AI mentor | LLM provider with streaming replies |
+| AI mentor | Google Gemini via REST API, single response |
 | Email | Brevo |
 | Attempt log sync | Google Sheets API, service account |
 | Analytics | PostHog or Mixpanel |
@@ -138,12 +138,15 @@ No code is executed, so nothing can run on the server or in the browser.
 
 ### Mentor Saral
 
-- **Context:** full course content, from the content bundle, included in the system prompt.
-- **Optimisation:** prompt caching used to reduce repeated processing and AI costs. The cached block is identical for every learner, so the whole course is included rather than trimmed to the learner's position.
-- **Interaction:** guided-first approach, with explanations and hints before providing solutions.
-- **Answer handling:** solution provided when the learner explicitly asks for it, consistent with the "Show me the answer" option already available in the interface.
-- **Availability:** available on chapter and story screens, but not during quizzes. The endpoint refuses requests that originate from a quiz step.
-- **Usage:** every exchange is recorded with its token counts, and per-learner limits cap AI spend.
+- **Context:** supplied Saral content blocks, one per mission, loaded from a configured path at startup. Each chapter carries its id, title, task and starter code. Chapter instructions, quizzes, solutions, `saralNotes` and the ending step are excluded.
+- **Personality:** supplied as a separate text file, placed first in the system instruction. It governs voice and tone only; behavioural rules sit after it and take precedence.
+- **Optimisation:** the system instruction block is byte-identical for every learner, so per-learner trimming is never applied. Gemini's implicit context caching reduces cost for repeated prefixes.
+- **Interaction:** Socratic-first approach — the first reply to a question is a leading question or a hint, never an explanation that resolves it.
+- **Answer handling:** Saral has no solutions and no quiz answers. When asked for the answer it says so honestly and offers a stronger hint.
+- **Availability:** available on chapter steps only, never during quizzes, story steps, or the ending. The endpoint refuses any step that is not a chapter.
+- **Response:** one complete response per request; no streaming.
+- **Memory:** spans the whole mission, but the learner only sees the current conversation. Saral never refers back to an earlier message.
+- **Usage:** every exchange is recorded with its token counts (including cached tokens), and per-learner daily limits cap AI spend.
 
 ---
 
@@ -369,7 +372,7 @@ A small Node.js and Express application, grouped into six areas.
 | Profile | Detective name, avatar and sound preference |
 | Progress | Records step completions and works out each mission's progress from them and the content bundle: status, where the learner left off, and chapter progress. The frontend displays it without calculating anything |
 | Attempts | Records every chapter and quiz submission, and syncs each row to the client's Google Sheet |
-| Saral | Passes questions to the AI provider with the course content, streams the reply back, applies usage limits, and refuses requests from quiz screens |
+| Saral | Passes questions to the AI provider with the course content, returns one complete reply, applies usage limits, and refuses requests from non-chapter steps |
 | Feedback | Stores chapter feedback and emails it on |
 
 ### Endpoints
@@ -389,7 +392,7 @@ learner's own data.
 | `GET /progress/:courseId` | The same for one mission, so a returning learner resumes where they stopped |
 | `PUT /progress/:courseId/steps/:stepId` | Records that the learner completed a step (moving forward, or reaching the ending). Steps not in the content are refused |
 | `POST /attempts` | Records one chapter or quiz submission and queues it for the attempt log |
-| `POST /saral/chat` | Sends a question to Saral and streams the reply back; refused on quiz screens |
+| `POST /saral/chat` | Sends a question to Saral and returns one complete reply; refused on non-chapter steps |
 | `POST /feedback` | Saves chapter feedback and sends it on by email |
 | `GET /health` | Confirms the application is running; used for uptime checks |
 

@@ -20,7 +20,7 @@ Read the relevant one before changing anything structural.
 | Database | PostgreSQL 18 via Prisma |
 | Auth | Better Auth — email OTP plugin, bearer plugin |
 | Email | Brevo |
-| AI | LLM provider with streaming replies |
+| AI | Google Gemini via REST API, single response |
 | Hosting | Single Google Cloud VM, Mumbai, behind nginx |
 
 The frontend is a separate repository (React, Vite, TypeScript). Both are
@@ -160,18 +160,33 @@ body or query parameter.
 
 ## Mentor Saral
 
-Saral is the in-app AI mentor. His knowledge is the course content bundle,
-injected whole into a cached system prompt.
+Saral is the in-app AI mentor, available on **chapter steps only** — never
+during quizzes, story steps, or the ending. The endpoint refuses any step
+that is not a chapter. Replies arrive in one complete response; there is no
+streaming anywhere in the system.
 
-- The whole course goes in the cached block, identical for every learner —
-  per-learner trimming would break prompt caching.
+- Saral's personality is supplied as a separate text file and sits first in
+  the system instruction. It governs voice only — tone and phrasing — never
+  what he may say, reveal or refuse. The behavioural rules come after it and
+  win.
+- The content blocks are supplied, one per mission, loaded from a configured
+  path at startup. Each chapter carries its id, title, task and starter code
+  only. Chapter instructions, every quiz, all solutions (`solutionCode`),
+  `saralNotes` and the ending step are excluded.
+- The content block is byte-identical for every learner. Per-learner trimming
+  would destroy prompt caching.
+- Saral has no solutions and no quiz answers. When asked for the answer it
+  says so honestly and offers a stronger hint, rather than deflecting as
+  though it were withholding something.
 - He must not discuss content from chapters ahead of the learner's position.
-- He is available on chapter and story screens, never during quizzes. The
-  endpoint refuses requests that originate from a quiz step.
-- Hints come from the chapter instructions and task. The `saralNotes` field
-  contains the solution and is only used when the learner explicitly asks for
-  the answer.
-- Every exchange is logged to `saral_messages` with its token counts.
+- Saral's memory spans the whole mission, but the learner only ever sees the
+  current conversation. Saral must never refer back to an earlier message.
+- Saral never sees the learner's code. If the problem depends on what they
+  wrote, Saral asks them to describe or paste it.
+- Every exchange is logged to `saral_messages` with its token counts,
+  including cached tokens.
+- There is no endpoint that returns past messages. `saral_messages` exists to
+  feed the model and for reporting; the client never reads it back.
 
 ---
 

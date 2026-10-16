@@ -262,6 +262,43 @@ Content-Type: application/json
 { "message": "Hello", "context": { "courseId": "1", "missionNumber": 1, "missionTitle": "AI Search Agent", "stepId": "ch-1", "chapterNumber": 1, "stepTitle": null, "pageUrl": "http://localhost:5173/courses/1/chapters/1" } }
 
 ###
+# Ask Saral a question on a chapter step. Requires a signed-in learner.
+# The courseId and stepId must be a chapter in a loaded Saral block.
+# Good: 200 {"reply":"…"} — a Socratic hint, not the answer.
+# Limited to SARAL_DAILY_LIMIT messages per learner per day (default 20).
+POST {{baseUrl}}/saral/chat
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "courseId": "demo", "stepId": "demo-ch-1", "message": "How do I install the openai package?" }
+
+###
+# Ask Saral on a quiz step — refused.
+# Good: 400 INVALID_INPUT ("Saral is only available on chapter steps.").
+POST {{baseUrl}}/saral/chat
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "courseId": "demo", "stepId": "demo-quiz-1", "message": "Help me with this quiz" }
+
+###
+# Ask Saral with an unknown step id — refused.
+# Good: 400 INVALID_INPUT.
+POST {{baseUrl}}/saral/chat
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "courseId": "demo", "stepId": "no-such-step", "message": "Hello" }
+
+###
+# Ask Saral without a token.
+# Good: 401 UNAUTHENTICATED.
+POST {{baseUrl}}/saral/chat
+Content-Type: application/json
+
+{ "courseId": "demo", "stepId": "demo-ch-1", "message": "Hello" }
+
+###
 # Sign out this device. Deletes this session only; other devices stay signed in.
 # Good: 200 {"success":true}. Also 200 with no token or one already signed out.
 POST {{baseUrl}}/auth/signout

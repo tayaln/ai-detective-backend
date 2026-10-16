@@ -37,6 +37,20 @@ const envSchema = z
     // Directory holding one <courseId>/course-bundle.json per mission, emitted
     // by the frontend build. Progress is worked out against it.
     CONTENT_BUNDLE_PATH: z.string(),
+    // AI mentor (Saral)
+    AI_PROVIDER_API_KEY: z.string().min(1),
+    AI_MODEL: z.string().min(1),
+    // Directory holding one <courseId>/saral-block.json per mission.
+    SARAL_BLOCK_PATH: z.string(),
+    // Path to the personality text file shared by every mission.
+    SARAL_PERSONALITY_PATH: z.string(),
+    // Max messages a learner may send per day across all missions.
+    // Budget arithmetic (Gemini Flash Lite pricing):
+    //   ~3000 input tokens + ~150 output tokens per exchange
+    //   20 messages/learner/day is a reasonable ceiling
+    SARAL_DAILY_LIMIT: z.coerce.number().int().positive().default(20),
+    // Max prior messages (both roles) replayed into each model call.
+    SARAL_HISTORY_CAP: z.coerce.number().int().positive().default(50),
     // Where chapter feedback notifications go.
     FEEDBACK_RECIPIENT_EMAIL: z.email().optional(),
     // The Apps Script web app that appends attempt rows. A credential: whoever
