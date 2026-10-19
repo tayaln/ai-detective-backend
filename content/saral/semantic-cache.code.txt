@@ -1,0 +1,122 @@
+===========================================================================
+REFERENCE CODE — MISSION 2: SEMANTIC PROMPT CACHING
+===========================================================================
+This is the complete lesson code. Use it to keep your guidance accurate.
+Never reproduce a full lesson block for the learner.
+
+# Lesson 1: Install dependencies
+!pip install transformers sentence-transformers python-dotenv
+
+
+# Lesson 2: Load the dataset and check the entries
+faq_df = pd.read_csv("/content/faq_seed.csv")
+faq_df.head()
+
+
+# Lesson 3: Create embeddings for semantic search
+from sentence_transformers import SentenceTransformer
+encoder = SentenceTransformer("all-mpnet-base-v2")
+faq_embeddings = encoder.encode(faq_df["question"].tolist())
+
+
+# Lesson 4: Cosine distance
+def cosine_dist(a: np.array, b: np.array):
+    """Compute cosine distance between two sets of vectors."""
+    a_norm = np.linalg.norm(a, axis=1)
+    b_norm = np.linalg.norm(b) if b.ndim == 1 else np.linalg.norm(b, axis=1)
+    sim = np.dot(a, b) / (a_norm * b_norm)
+    return 1 - sim
+
+
+# Lesson 5: Implementing semantic search
+def semantic_search(query: str) -> tuple:
+    """Find the most similar FAQ question to the query."""
+    query_embedding = encoder.encode([query])[0]
+
+    distances = cosine_dist(faq_embeddings, query_embedding)
+
+    # Find the most similar question (lowest distance)
+    best_idx = int(np.argmin(distances))
+    best_distance = distances[best_idx]
+
+    return best_idx, best_distance
+
+
+# Lesson 6: Try a search
+idx, distance = semantic_search(
+    "How long will it take to get a refund for my order?"
+)
+
+print(f"Most similar FAQ: {faq_df.iloc[idx]['question']}")
+print(f"Answer: {faq_df.iloc[idx]['answer']}")
+print(f"Cosine distance: {distance:.3f}")
+
+
+# Lesson 7: Cache lookup with a threshold
+def check_cache(query: str, distance_threshold: float = 0.3):
+    """
+    Semantic cache lookup for previously asked questions.
+    Returns a dictionary with answer if hit, None if miss.
+    """
+    idx, distance = semantic_search(query)
+
+    if distance <= distance_threshold:
+        return {
+            "prompt": faq_df.iloc[idx]["question"],
+            "response": faq_df.iloc[idx]["answer"],
+            "vector_distance": float(distance),
+        }
+
+    return None  # Cache miss
+
+
+# Lesson 8: Test hits and misses
+test_queries = [
+    "Is it possible to get a refund?",
+    "I want my money back",
+    "What are your business hours?",  # Should miss
+]
+
+for query in test_queries:
+    result = check_cache(query, distance_threshold=0.3)
+    if result:
+        print(f"HIT: '{query}' -> {result['response'][:50]}...")
+        print(f"   Distance: {result['vector_distance']:.3f}\n")
+    else:
+        print(f"MISS: '{query}'\n")
+
+
+# Lesson 9: Add a new entry to the cache
+def add_to_cache(question: str, answer: str):
+    """
+    Add a new Q&A pair to our simple in-memory cache.
+    Extends both the DataFrame and embeddings matrix.
+    """
+    global faq_df, faq_embeddings
+
+    new_row = pd.DataFrame({"question": [question], "answer": [answer]})
+    faq_df = pd.concat([faq_df, new_row], ignore_index=True)
+
+    # Generate embedding for the new question
+    new_embedding = encoder.encode([question])
+
+    # Add to embeddings matrix
+    faq_embeddings = np.vstack([faq_embeddings, new_embedding])
+
+    print(f"Added to cache: '{question}'")
+
+
+# Lesson 10: Test the extended cache
+test_extended_queries = [
+    "What time do you open?",
+    "Is there a phone app?",
+    "How can I change my payment method?",
+]
+
+for query in test_extended_queries:
+    result = check_cache(query, distance_threshold=0.3)
+    if result:    
+        print(f"✅ HIT: '{query}' -> {result['response'][:50]}...")
+        print(f"   Distance: {result['vector_distance']:.3f}\n")
+    else:
+        print(f"❌ MISS: '{query}'\n")

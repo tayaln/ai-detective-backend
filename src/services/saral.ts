@@ -1,33 +1,19 @@
+import { GoogleGenAI } from '@google/genai';
 import { countTodayMessages, createSaralMessages, getRecentMessages } from '../db/saral.ts';
 import { config } from '../lib/config.ts';
 import { AppError } from '../lib/errors.ts';
 import { logger } from '../lib/logger.ts';
+import { getCourse } from '../lib/content.ts';
 import { getSaralBlock } from '../lib/saral-content.ts';
 
-const GEMINI_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
+const ai = new GoogleGenAI({
+  vertexai: true,
+  project: config.GOOGLE_CLOUD_PROJECT,
+  location: config.GOOGLE_CLOUD_LOCATION,
+});
+
 const REQUEST_TIMEOUT_MS = 30_000;
-
-interface GeminiPart {
-  text: string;
-}
-
-interface GeminiContent {
-  role: 'user' | 'model';
-  parts: GeminiPart[];
-}
-
-interface GeminiUsageMetadata {
-  promptTokenCount?: number;
-  candidatesTokenCount?: number;
-  totalTokenCount?: number;
-  cachedContentTokenCount?: number;
-}
-
-interface GeminiResponse {
-  candidates?: { content: { parts: GeminiPart[]; role: string } }[];
-  usageMetadata?: GeminiUsageMetadata;
-  error?: { code: number; message: string; status: string };
-}
+let loggedFirstCachedTokens = false;
 
 export async function chatWithSaral(
   learnerId: string,
@@ -49,45 +35,70 @@ export async function chatWithSaral(
     throw new AppError(429, 'RATE_LIMITED', 'You have reached your daily question limit. Try again tomorrow.');
   }
 
+  const course = getCourse(courseId);
+  const chapterSteps = course?.steps.filter((s) => s.type === 'chapter') ?? [];
+  const chapterIndex = chapterSteps.findIndex((s) => s.id === stepId);
+  const lessonNumber = chapterIndex + 1;
+
   const history = await getRecentMessages(learnerId, courseId);
 
-  const contents: GeminiContent[] = history.map((m) => ({
-    role: m.role === 'assistant' ? 'model' : 'user',
-    parts: [
-      { text: m.role === 'user' ? `<user_input>\n${m.content}\n</user_input>` : m.content },
-    ],
-  }));
+  const contents: { role: 'user' | 'model'; parts: { text: string }[] }[] = [
+    {
+      role: 'user',
+      parts: [{ text: `The learner is currently on Lesson ${lessonNumber}. Ground your answers in this lesson and earlier ones only.` }],
+    },
+    {
+      role: 'model',
+      parts: [{ text: 'Understood.' }],
+    },
+  ];
+
+  for (const m of history) {
+    contents.push({
+      role: m.role === 'assistant' ? 'model' : 'user',
+      parts: [
+        { text: m.role === 'user' ? `<user_input>\n${m.content}\n</user_input>` : m.content },
+      ],
+    });
+  }
   contents.push({
     role: 'user',
     parts: [{ text: `<user_input>\n${message}\n</user_input>` }],
   });
 
-  const url = `${GEMINI_BASE_URL}/${config.AI_MODEL}:generateContent?key=${config.AI_PROVIDER_API_KEY}`;
+  let reply: string;
+  let promptTokenCount: number | undefined;
+  let candidatesTokenCount: number | undefined;
+  let cachedContentTokenCount: number | undefined;
 
-  const body = {
-    system_instruction: {
-      parts: [{ text: block.systemPrompt }],
-    },
-    contents,
-    generationConfig: {
-      maxOutputTokens: 1024,
-    },
-  };
-
-  let data: GeminiResponse;
   try {
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    const response = await ai.models.generateContent({
+      model: config.AI_MODEL,
+      contents,
+      config: {
+        systemInstruction: block.systemPrompt,
+        maxOutputTokens: 1024,
+        thinkingConfig: { includeThoughts: false },
+        abortSignal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      },
     });
 
-    data = (await res.json()) as GeminiResponse;
+    reply =
+      response.candidates?.[0]?.content?.parts
+        ?.map((p) => p.text)
+        .join('') ?? '';
 
-    if (!res.ok) {
-      const errMsg = data.error?.message ?? `HTTP ${res.status}`;
-      throw new Error(errMsg);
+    const usage = response.usageMetadata;
+    promptTokenCount = usage?.promptTokenCount ?? undefined;
+    candidatesTokenCount = usage?.candidatesTokenCount ?? undefined;
+    cachedContentTokenCount = usage?.cachedContentTokenCount ?? undefined;
+
+    if (!loggedFirstCachedTokens) {
+      loggedFirstCachedTokens = true;
+      logger.info(
+        { courseId, cachedContentTokenCount: cachedContentTokenCount ?? 0 },
+        'First Saral request after restart — cached token count',
+      );
     }
   } catch (err) {
     if (err instanceof AppError) throw err;
@@ -99,22 +110,15 @@ export async function chatWithSaral(
     );
   }
 
-  const reply =
-    data.candidates?.[0]?.content?.parts
-      ?.map((p) => p.text)
-      .join('') ?? '';
-
-  const usage = data.usageMetadata;
-
   createSaralMessages(learnerId, [
     {
       courseId,
       stepId,
       role: 'user',
       content: message,
-      inputTokens: usage?.promptTokenCount ?? null,
+      inputTokens: promptTokenCount ?? null,
       outputTokens: null,
-      cachedTokens: usage?.cachedContentTokenCount ?? null,
+      cachedTokens: cachedContentTokenCount ?? null,
     },
     {
       courseId,
@@ -122,7 +126,7 @@ export async function chatWithSaral(
       role: 'assistant',
       content: reply,
       inputTokens: null,
-      outputTokens: usage?.candidatesTokenCount ?? null,
+      outputTokens: candidatesTokenCount ?? null,
       cachedTokens: null,
     },
   ]).catch((err) => {

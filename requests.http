@@ -270,7 +270,16 @@ POST {{baseUrl}}/saral/chat
 Authorization: Bearer {{token}}
 Content-Type: application/json
 
-{ "courseId": "demo", "stepId": "demo-ch-1", "message": "How do I install the openai package?" }
+{ "courseId": "search-agent", "stepId": "sa-ch-1-install-ai-toolkit", "message": "How do I install the openai package?" }
+
+###
+# Ask Saral with a 1,001-character message — rejected.
+# Good: 400 INVALID_INPUT.
+POST {{baseUrl}}/saral/chat
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "courseId": "search-agent", "stepId": "sa-ch-1-install-ai-toolkit", "message": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaX" }
 
 ###
 # Ask Saral on a quiz step — refused.
@@ -279,7 +288,7 @@ POST {{baseUrl}}/saral/chat
 Authorization: Bearer {{token}}
 Content-Type: application/json
 
-{ "courseId": "demo", "stepId": "demo-quiz-1", "message": "Help me with this quiz" }
+{ "courseId": "search-agent", "stepId": "sa-quiz-1", "message": "Help me with this quiz" }
 
 ###
 # Ask Saral with an unknown step id — refused.
@@ -288,7 +297,7 @@ POST {{baseUrl}}/saral/chat
 Authorization: Bearer {{token}}
 Content-Type: application/json
 
-{ "courseId": "demo", "stepId": "no-such-step", "message": "Hello" }
+{ "courseId": "search-agent", "stepId": "no-such-step", "message": "Hello" }
 
 ###
 # Ask Saral without a token.
@@ -296,7 +305,7 @@ Content-Type: application/json
 POST {{baseUrl}}/saral/chat
 Content-Type: application/json
 
-{ "courseId": "demo", "stepId": "demo-ch-1", "message": "Hello" }
+{ "courseId": "search-agent", "stepId": "sa-ch-1-install-ai-toolkit", "message": "Hello" }
 
 ###
 # Sign out this device. Deletes this session only; other devices stay signed in.

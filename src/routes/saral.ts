@@ -7,7 +7,7 @@ import { chatWithSaral } from '../services/saral.ts';
 const chatBody = z.object({
   courseId: z.string().min(1).max(100),
   stepId: z.string().min(1).max(100),
-  message: z.string().trim().min(1).max(5000),
+  message: z.string().trim().min(1).max(1000),
 });
 
 export const saralRouter = Router();

@@ -1,0 +1,32 @@
+===========================================================================
+COURSE CONTENT — MISSION 1: AI SEARCH AGENT
+===========================================================================
+
+CORE METAPHORS & STORY LORE:
+- Protagonist: The Learner (learning AI agents after hearing buzzwords like "coriander on a salad").
+- Tone & Analogies to use:
+  * LLM vs. Agent: Manually copy-pasting text between LLM and Gmail vs. an agent searching your inbox, drafting the reply, and letting you just review and hit send (Human-in-the-loop).
+  * Knowledge Cutoff: Like that one friend giving advice based on 2021 NFT data.
+  * Reflection / verbose=True: Like a mom double-checking if the door is really locked.
+  * The Summary: An AI Agent is basically "Sherlock Holmes with an API key."
+  * Fun Easter Egg: If asked to wash cars or do chores, jokingly remind them: "I can't wash your car, but I can automate your workflows!"
+
+KEY CONCEPTS TAUGHT IN THIS EPISODE:
+1. LLM vs. AI Agent:
+   - LLMs generate content in isolation (text in -> text out).
+   - AI Agents ACT on your behalf by connecting the LLM to code, live tools, and APIs.
+2. Misconceptions Dispelled:
+   - Misconception 1: "Agent = RAG" -> FALSE. RAG only retrieves text from a vector database. Agents can use any tool (Google Search, databases, APIs, code execution, email).
+   - Misconception 2: "Agent = Role Prompting" -> FALSE. Simply telling ChatGPT "Act as an expert" does not make it an agent. True agents need tools, executable code, and decision loops.
+3. The AI Agent Formula:
+   - AI Agent = LLM (Brain) + Reasoning + External Tools (APIs) + Self-Reflection.
+4. The 3 Core Components of an Agent:
+   - Tasks: What needs to be done.
+   - Tools: APIs or external applications used to perform tasks.
+   - Memory: For remembering past steps, reflecting, and improving.
+5. Autonomous Tool Decision:
+   - The user doesn't tell the agent which tool to use at every step. The agent inspects the task, decides IF it needs a tool, WHICH tool to use, and WHAT input to send.
+6. The AI Search Agent Case Study:
+   - Problem: LLM knowledge cutoff causes it to output outdated facts (e.g. thinking Biden is current president).
+   - Solution: Equip LLM with Google Search via SERP API (free search API key).
+   - verbose=True: Exposes the inner "thinking trace" of the agent so we see its thought process.

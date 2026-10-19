@@ -1,0 +1,44 @@
+===========================================================================
+COURSE CONTENT — MISSION 2: SEMANTIC PROMPT CACHING
+===========================================================================
+
+CORE STORY & THEMES:
+- Protagonist: The Learner (shocked by a massive agent token bill that "looks like a ransom note").
+- Mentor: Saral (calm, witty, pragmatic production engineer).
+- Inside Jokes & Analogies to use:
+  * Paying twice for the same static tokens is like "paying tax on tax."
+  * "The cheapest LLM call is the one you never have to make."
+  * Threshold tuning: "We replaced prompt engineering with threshold engineering."
+  * Guardrail warning: "A cache hit should save tokens, not summon a human."
+  * "No optimization is complete until it creates another dashboard."
+
+1. THE ROOT PROBLEM — AGENTS IN PRODUCTION:
+   - AI agents run multi-step loops (plan, act, observe, reflect, retry).
+   - A single complex task can take 20-40 reasoning steps, rapidly accumulating thousands of tokens and high costs.
+
+2. TECHNIQUE 1: EXACT PROMPT CACHING (EPHEMERAL CACHE):
+   - Reuses pre-computed KV cache for identical static prompt prefixes (e.g. long system instructions, documentation, book contents).
+   - Syntax: Uses `"cache_control": {"type": "ephemeral"}` on the static block.
+   - Metrics:
+     * Call 1 (Cache Miss): `cache_creation_input_tokens` = full size, `cache_read_input_tokens` = 0.
+     * Call 2 (Cache Hit): `cache_creation_input_tokens` = 0, `cache_read_input_tokens` = full size (charged at a fraction of the cost).
+   - Limitation: Relies on exact, character-for-character string matching. Fails if user rephrases.
+
+3. TECHNIQUE 2: SEMANTIC PROMPT CACHING:
+   - Solves rephrasing ("How do I get a refund?" vs. "Can I get my money back?" vs. "Refund policy?").
+   - Architecture:
+     1. User query -> Generate Embedding.
+     2. Vector similarity search (Cosine distance) against stored Q&A cache.
+     3. Compare distance against a predefined Threshold:
+        - Distance <= Threshold (CACHE HIT): Return stored answer instantly. (Cost = $0, Latency = near 0ms).
+        - Distance > Threshold (CACHE MISS): Call LLM -> Generate fresh answer -> Save query + answer into cache for next time.
+
+4. THRESHOLD ENGINEERING & THE DANGERS:
+   - Too strict: Misses valid cache hits (wastes money).
+   - Too loose: Returns wrong answers to different intents.
+   - Crucial Nuance: "Semantic similarity does not mean semantic equivalence."
+     * E.g. "How do I cancel my subscription?" vs. "How do I pause my subscription?" are close in vector space, but completely different actions!
+
+5. PRODUCTION CONSIDERATIONS:
+   - Cache Invalidation & Freshness: Policies change, products update; stale answers must be refreshed or evicted.
+   - Observability: Must track Cache Hit Rate, Latency reduction, Cost savings, and Cache Quality.

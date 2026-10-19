@@ -40,6 +40,7 @@
     "typescript-eslint": "^8.71.1"
   },
   "dependencies": {
+    "@google/genai": "^2.30.0",
     "@prisma/adapter-pg": "^7.10.0",
     "@prisma/client": "^7.10.0",
     "better-auth": "^1.7.7",
