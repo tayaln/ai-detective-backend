@@ -1,4 +1,5 @@
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenAI, type GenerateContentResponse } from '@google/genai';
+import { propagateAttributes, startActiveObservation } from '@langfuse/tracing';
 import { countTodayMessages, createSaralMessages, getRecentMessages } from '../db/saral.ts';
 import { config } from '../lib/config.ts';
 import { AppError } from '../lib/errors.ts';
@@ -13,7 +14,12 @@ const ai = new GoogleGenAI({
 });
 
 const REQUEST_TIMEOUT_MS = 30_000;
+const MAX_OUTPUT_TOKENS = 1024;
 let loggedFirstCachedTokens = false;
+
+function replyText(response: GenerateContentResponse): string {
+  return response.candidates?.[0]?.content?.parts?.map((p) => p.text).join('') ?? '';
+}
 
 export async function chatWithSaral(
   learnerId: string,
@@ -32,7 +38,11 @@ export async function chatWithSaral(
 
   const todayCount = await countTodayMessages(learnerId);
   if (todayCount >= config.SARAL_DAILY_LIMIT) {
-    throw new AppError(429, 'RATE_LIMITED', 'You have reached your daily question limit. Try again tomorrow.');
+    throw new AppError(
+      429,
+      'RATE_LIMITED',
+      'You have reached your daily question limit. Try again tomorrow.',
+    );
   }
 
   const course = getCourse(courseId);
@@ -45,7 +55,11 @@ export async function chatWithSaral(
   const contents: { role: 'user' | 'model'; parts: { text: string }[] }[] = [
     {
       role: 'user',
-      parts: [{ text: `The learner is currently on Lesson ${lessonNumber}. Ground your answers in this lesson and earlier ones only.` }],
+      parts: [
+        {
+          text: `The learner is currently on Lesson ${lessonNumber}. Ground your answers in this lesson and earlier ones only.`,
+        },
+      ],
     },
     {
       role: 'model',
@@ -72,21 +86,57 @@ export async function chatWithSaral(
   let cachedContentTokenCount: number | undefined;
 
   try {
-    const response = await ai.models.generateContent({
-      model: config.AI_MODEL,
-      contents,
-      config: {
-        systemInstruction: block.systemPrompt,
-        maxOutputTokens: 1024,
-        thinkingConfig: { includeThoughts: false },
-        abortSignal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    // One Langfuse trace per exchange. The system prompt is left out of the
+    // trace input: it is identical for every learner, so promptVersion names it.
+    const response = await propagateAttributes(
+      {
+        userId: learnerId,
+        sessionId: `${learnerId}:${courseId}`,
+        traceName: 'saral-chat',
+        metadata: {
+          courseId,
+          stepId,
+          lessonNumber: String(lessonNumber),
+          promptVersion: block.promptVersion,
+        },
       },
-    });
+      () =>
+        startActiveObservation(
+          'gemini-generate',
+          async (generation) => {
+            generation.update({
+              model: config.AI_MODEL,
+              input: contents,
+              modelParameters: { maxOutputTokens: MAX_OUTPUT_TOKENS },
+            });
 
-    reply =
-      response.candidates?.[0]?.content?.parts
-        ?.map((p) => p.text)
-        .join('') ?? '';
+            const result = await ai.models.generateContent({
+              model: config.AI_MODEL,
+              contents,
+              config: {
+                systemInstruction: block.systemPrompt,
+                maxOutputTokens: MAX_OUTPUT_TOKENS,
+                thinkingConfig: { includeThoughts: false },
+                abortSignal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+              },
+            });
+
+            const usage = result.usageMetadata;
+            generation.update({
+              output: replyText(result),
+              usageDetails: {
+                input: usage?.promptTokenCount ?? 0,
+                output: usage?.candidatesTokenCount ?? 0,
+                cache_read_input_tokens: usage?.cachedContentTokenCount ?? 0,
+              },
+            });
+            return result;
+          },
+          { asType: 'generation' },
+        ),
+    );
+
+    reply = replyText(response);
 
     const usage = response.usageMetadata;
     promptTokenCount = usage?.promptTokenCount ?? undefined;
