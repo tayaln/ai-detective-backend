@@ -57,6 +57,11 @@ const envSchema = z
     SARAL_RETRY_BASE_DELAY: z.coerce.number().positive().default(1.0),
     // Per-attempt timeout in seconds for each Gemini request.
     SARAL_REQUEST_TIMEOUT: z.coerce.number().int().positive().default(12),
+    // Langfuse tracing for Saral. Both keys unset means no tracing. The secret
+    // key is a credential: .env only.
+    LANGFUSE_PUBLIC_KEY: z.string().optional(),
+    LANGFUSE_SECRET_KEY: z.string().optional(),
+    LANGFUSE_BASE_URL: z.url({ protocol: /^https?$/ }).default('https://cloud.langfuse.com'),
     // Where chapter feedback notifications go.
     FEEDBACK_RECIPIENT_EMAIL: z.email().optional(),
     // The Apps Script web app that appends attempt rows. A credential: whoever
@@ -66,6 +71,16 @@ const envSchema = z
     GOOGLE_SHEET_URL: z.url({ protocol: /^https$/ }).optional(),
   })
   .superRefine((env, ctx) => {
+    // Half a key pair is a typo, not a decision to turn tracing off.
+    if ((env.LANGFUSE_PUBLIC_KEY === undefined) !== (env.LANGFUSE_SECRET_KEY === undefined)) {
+      const missing =
+        env.LANGFUSE_PUBLIC_KEY === undefined ? 'LANGFUSE_PUBLIC_KEY' : 'LANGFUSE_SECRET_KEY';
+      ctx.addIssue({
+        code: 'custom',
+        path: [missing],
+        message: 'is required when the other Langfuse key is set',
+      });
+    }
     if (env.EMAIL_MODE !== 'live') {
       return;
     }

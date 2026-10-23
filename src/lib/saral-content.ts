@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { config } from './config.ts';
@@ -11,6 +12,8 @@ export interface SaralBlock {
   courseId: string;
   chapterStepIds: ReadonlySet<string>;
   systemPrompt: string;
+  /** Short hash of systemPrompt, so traces show which prompt text was in use. */
+  promptVersion: string;
 }
 
 let blocks: ReadonlyMap<string, SaralBlock> | undefined;
@@ -88,10 +91,12 @@ function loadMission(
     }
   }
 
+  const fullPrompt = [systemPrompt, content, code].join('\n\n');
   loaded.set(courseId, {
     courseId,
     chapterStepIds,
-    systemPrompt: [systemPrompt, content, code].join('\n\n'),
+    systemPrompt: fullPrompt,
+    promptVersion: createHash('sha256').update(fullPrompt).digest('hex').slice(0, 12),
   });
 }
 

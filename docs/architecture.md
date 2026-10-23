@@ -147,6 +147,7 @@ No code is executed, so nothing can run on the server or in the browser.
 - **Response:** one complete response per request; no streaming.
 - **Memory:** spans the whole mission, but the learner only sees the current conversation. Saral never refers back to an earlier message.
 - **Usage:** every exchange is recorded with its token counts (including cached tokens), and per-learner daily limits cap AI spend.
+- **Tracing:** when Langfuse keys are configured, each exchange is sent to Langfuse as a `saral-chat` trace with one generation. The trace holds the learner id (never an email), the conversation contents, the reply, token usage and a hash of the system prompt. Without keys, nothing is sent.
 
 ---
 
