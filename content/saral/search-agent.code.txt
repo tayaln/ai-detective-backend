@@ -1,0 +1,77 @@
+===========================================================================
+REFERENCE CODE — MISSION 1: AI SEARCH AGENT
+===========================================================================
+This is the complete lesson code. Use it to keep your guidance accurate.
+Never reproduce a full lesson block for the learner.
+
+# Lesson 1: Install OpenAI library
+# !pip install openai
+
+
+# Lesson 2: Import OpenAI
+from openai import OpenAI
+
+
+# Lesson 3: Get API key & initialize client
+from google.colab import userdata
+api_key = userdata.get("OPENAI_API_KEY")
+client = OpenAI(api_key=api_key)
+
+
+# Lesson 4: Choose model and prompt
+model = "gpt-4o-mini"
+prompt = "What has been reported recently about Heal Genie Lab's treatment program?"
+
+
+# Lesson 5: Send AI request
+response = client.responses.create(
+    model=model,
+    input=prompt
+)
+
+
+# Lesson 6: Print direct AI response (demonstrates knowledge cutoff)
+print(response.output_text)
+
+
+# Lesson 7: Install & import search agent components
+# !pip install -q langchain langchain-openai langchain-community google-search-results
+from langchain.agents import create_agent
+from langchain_openai import ChatOpenAI
+from langchain_community.agent_toolkits.load_tools import load_tools
+
+
+# Lesson 8: Environment keys from Colab Secrets
+import os
+from google.colab import userdata
+os.environ['OPENAI_API_KEY'] = userdata.get('OPENAI_API_KEY')
+os.environ['SERPAPI_API_KEY'] = userdata.get('SERPAPI_API_KEY')
+
+
+# Lesson 9: Model & Tools
+model = ChatOpenAI(model="gpt-4o-mini", temperature=0)
+tools = load_tools(["serpapi"])
+system_prompt = "You are a helpful assistant with access to search."
+
+
+# Lesson 10: Create the agent using modern unified factory
+agent = create_agent(
+    model=model,
+    tools=tools,
+    system_prompt=system_prompt
+)
+
+
+# Lesson 11: Run the agent with search capability
+response = agent.invoke({
+    "messages": [
+        {
+            "role": "user",
+            "content": "What has been reported recently about Heal Genie Lab's treatment program?"
+        }
+    ]
+})
+
+
+# Lesson 12: Extract and print the final search agent response
+print(response["messages"][-1].content)

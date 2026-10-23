@@ -1,0 +1,10 @@
+dist
+node_modules
+logs
+src/generated
+prisma/migrations
+package-lock.json
+# Reference documents are kept exactly as drafted.
+CLAUDE.md
+docs/
+tasks/

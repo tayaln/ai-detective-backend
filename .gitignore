@@ -1,1 +1,30 @@
-/backend-tasks
+/tasks
+
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Generated Prisma client — rebuilt by `npm install` (postinstall)
+src/generated/
+
+# Environment — .env.example is the only env file that is committed
+.env
+.env.*
+!.env.example
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editors
+.idea/
+.vscode/*
+!.vscode/extensions.json
+/.claude

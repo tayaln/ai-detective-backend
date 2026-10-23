@@ -1,0 +1,91 @@
+{
+  "courseId": "search-agent",
+  "steps": [
+    {
+      "id": "sa-ch-1-install-ai-toolkit",
+      "type": "chapter",
+      "title": "Install the AI Toolkit",
+      "task": "Install the openai library.",
+      "starterCode": ""
+    },
+    {
+      "id": "sa-ch-2-read-the-response",
+      "type": "chapter",
+      "title": "Read the AI's Response",
+      "task": "Import OpenAI from the openai library.",
+      "starterCode": ""
+    },
+    {
+      "id": "sa-ch-3-getting-the-api-key",
+      "type": "chapter",
+      "title": "Getting the API Key",
+      "task": "Retrieve the OpenAI API key stored in Google Colab Secrets and store it in a variable called api_key.",
+      "starterCode": ""
+    },
+    {
+      "id": "sa-ch-4-give-the-ai-a-task",
+      "type": "chapter",
+      "title": "Give the AI a Task",
+      "task": "Set the model to gpt-4o-mini and store the investigation question in a variable called prompt.",
+      "starterCode": ""
+    },
+    { "id": "sa-quiz-1", "type": "quiz" },
+    {
+      "id": "sa-ch-5-send-your-first-ai-request",
+      "type": "chapter",
+      "title": "Send Your First AI Request",
+      "task": "Use client.responses.create() to send the model and prompt to the AI, and store the result in a variable called response.",
+      "starterCode": ""
+    },
+    {
+      "id": "sa-ch-6-read-the-response",
+      "type": "chapter",
+      "title": "Read the AI's Response",
+      "task": "Print the AI's generated text from the response object.",
+      "starterCode": ""
+    },
+    {
+      "id": "sa-ch-7-give-the-ai-a-search-tool",
+      "type": "chapter",
+      "title": "Give the AI a Search Tool",
+      "task": "Import the three components needed to create an AI agent, connect to an OpenAI model, and load search tools.",
+      "starterCode": ""
+    },
+    {
+      "id": "sa-ch-8-connect-the-search-service",
+      "type": "chapter",
+      "title": "Connect the Search Service",
+      "task": "Set up the SERPAPI_API_KEY environment variable using the SerpAPI key stored in Google Colab Secrets.",
+      "starterCode": ""
+    },
+    { "id": "sa-quiz-2", "type": "quiz" },
+    {
+      "id": "sa-ch-9-give-your-ai-a-search-tool",
+      "type": "chapter",
+      "title": "Give Your AI a Search Tool",
+      "task": "Load the SerpAPI search tool and give our AI access to web search.",
+      "starterCode": ""
+    },
+    {
+      "id": "sa-ch-10-create-the-ai-agent",
+      "type": "chapter",
+      "title": "Create the AI Agent",
+      "task": "Create the AI agent using the create_agent method.",
+      "starterCode": ""
+    },
+    {
+      "id": "sa-ch-11-run-the-ai-agent",
+      "type": "chapter",
+      "title": "Run the AI Agent",
+      "task": "Ask the AI agent about what has been reported recently about Heal Genie Lab's treatment program by using invoke().",
+      "starterCode": ""
+    },
+    {
+      "id": "sa-ch-12-read-the-agents-response",
+      "type": "chapter",
+      "title": "Read the Agent's Response",
+      "task": "Extract and print the agent's final response from the response object.",
+      "starterCode": ""
+    }
+  ]
+}

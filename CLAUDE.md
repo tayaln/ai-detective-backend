@@ -20,7 +20,7 @@ Read the relevant one before changing anything structural.
 | Database | PostgreSQL 18 via Prisma |
 | Auth | Better Auth — email OTP plugin, bearer plugin |
 | Email | Brevo |
-| AI | LLM provider with streaming replies |
+| AI | Google Gemini on Vertex AI via GCP project, ADC auth, single response |
 | Hosting | Single Google Cloud VM, Mumbai, behind nginx |
 
 The frontend is a separate repository (React, Vite, TypeScript). Both are
@@ -160,18 +160,36 @@ body or query parameter.
 
 ## Mentor Saral
 
-Saral is the in-app AI mentor. His knowledge is the course content bundle,
-injected whole into a cached system prompt.
+Saral is the in-app AI mentor, available on **chapter steps only** — never
+during quizzes, story steps, or the ending. The endpoint refuses any step
+that is not a chapter. Replies arrive in one complete response; there is no
+streaming anywhere in the system.
 
-- The whole course goes in the cached block, identical for every learner —
-  per-learner trimming would break prompt caching.
+- The prompt is five supplied text files in `SARAL_BLOCK_PATH`:
+  `system-prompt.txt` (shared), `<courseId>.content.txt` (per mission),
+  `<courseId>.code.txt` (per mission). Loaded once at startup, concatenated
+  in that order into one system instruction per mission. No prompt text is
+  hardcoded in source — the files are the only source.
+- The assembled block is byte-identical for every learner. Per-learner
+  trimming would destroy prompt caching. The shared prefix
+  (`system-prompt.txt`) is as long as possible across missions.
+- Saral holds the reference code but never writes a full solution. The
+  learner is pointed at the game editor. The no-code-dumps rule in the prompt
+  is a behavioural guard, not a structural one.
+- Saral has no quiz answers. When asked for one it says so honestly and
+  offers a stronger hint.
 - He must not discuss content from chapters ahead of the learner's position.
-- He is available on chapter and story screens, never during quizzes. The
-  endpoint refuses requests that originate from a quiz step.
-- Hints come from the chapter instructions and task. The `saralNotes` field
-  contains the solution and is only used when the learner explicitly asks for
-  the answer.
-- Every exchange is logged to `saral_messages` with its token counts.
+- Conversation memory is the last 20 messages of the mission. The learner
+  sees only the current conversation, so Saral must never refer back to an
+  earlier message.
+- Saral never sees the learner's code. If the problem depends on what they
+  wrote, Saral asks them to describe or paste it.
+- Learner messages are capped at 1,000 characters and replies at 300 tokens.
+- Every exchange is logged to `saral_messages` with its token counts,
+  including cached tokens. `cached_content_token_count` is recorded on every
+  exchange.
+- There is no endpoint that returns past messages. `saral_messages` exists to
+  feed the model and for reporting; the client never reads it back.
 
 ---
 

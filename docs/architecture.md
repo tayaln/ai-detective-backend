@@ -80,7 +80,7 @@ updated independently.
 | Code editor | Monaco Editor |
 | Styling | Tailwind CSS with shadcn/ui |
 | Frontend libraries | React Router, TanStack Query, Zod |
-| AI mentor | LLM provider with streaming replies |
+| AI mentor | Google Gemini via REST API, single response |
 | Email | Brevo |
 | Attempt log sync | Google Sheets API, service account |
 | Analytics | PostHog or Mixpanel |
@@ -138,12 +138,16 @@ No code is executed, so nothing can run on the server or in the browser.
 
 ### Mentor Saral
 
-- **Context:** full course content, from the content bundle, included in the system prompt.
-- **Optimisation:** prompt caching used to reduce repeated processing and AI costs. The cached block is identical for every learner, so the whole course is included rather than trimmed to the learner's position.
-- **Interaction:** guided-first approach, with explanations and hints before providing solutions.
-- **Answer handling:** solution provided when the learner explicitly asks for it, consistent with the "Show me the answer" option already available in the interface.
-- **Availability:** available on chapter and story screens, but not during quizzes. The endpoint refuses requests that originate from a quiz step.
-- **Usage:** every exchange is recorded with its token counts, and per-learner limits cap AI spend.
+- **Context:** supplied Saral content blocks, one per mission, loaded from a configured path at startup. Each chapter carries its id, title, task and starter code. Chapter instructions, quizzes, solutions, `saralNotes` and the ending step are excluded.
+- **Personality:** supplied as a separate text file, placed first in the system instruction. It governs voice and tone only; behavioural rules sit after it and take precedence.
+- **Optimisation:** the system instruction block is byte-identical for every learner, so per-learner trimming is never applied. Gemini's implicit context caching reduces cost for repeated prefixes.
+- **Interaction:** Socratic-first approach — the first reply to a question is a leading question or a hint, never an explanation that resolves it.
+- **Answer handling:** Saral has no solutions and no quiz answers. When asked for the answer it says so honestly and offers a stronger hint.
+- **Availability:** available on chapter steps only, never during quizzes, story steps, or the ending. The endpoint refuses any step that is not a chapter.
+- **Response:** one complete response per request; no streaming.
+- **Memory:** spans the whole mission, but the learner only sees the current conversation. Saral never refers back to an earlier message.
+- **Usage:** every exchange is recorded with its token counts (including cached tokens), and per-learner daily limits cap AI spend.
+- **Tracing:** when Langfuse keys are configured, each exchange is sent to Langfuse as a `saral-chat` trace with one generation. The trace holds the learner id (never an email), the conversation contents, the reply, token usage and a hash of the system prompt. Without keys, nothing is sent.
 
 ---
 
@@ -224,7 +228,8 @@ belong to the application.
 erDiagram
   user ||--|| profiles : has
   user ||--o{ session : has
-  user ||--o{ course_progress : has
+  user ||--o{ course_step_completions : has
+  user ||--o{ course_positions : has
   user ||--o{ attempts : submits
   user ||--o{ feedback : writes
   user ||--o{ saral_messages : exchanges
@@ -255,17 +260,33 @@ No passwords are stored, since sign-in uses a one-time code sent to email.
 | avatar_id | text | Preset avatar |
 | sound_on | boolean | Celebration sound preference |
 | last_seen_at | timestamptz | Updated when the application is opened |
+| created_at | timestamptz | |
 | updated_at | timestamptz | |
 
-#### course_progress
+#### course_step_completions
 
 | Column | Type | Notes |
 |---|---|---|
 | learner_id | text | Part of the primary key; references user |
 | course_id | text | Part of the primary key; matches the content files |
-| current_step_id | text | Where the learner has reached |
-| started_at | timestamptz | |
-| completed_at | timestamptz | Set when the ending screen is reached |
+| step_id | text | Part of the primary key; the step completed: moved on from, a chapter answered correctly, a quiz submitted, or the ending reached |
+| completed_at | timestamptz | Set once, on the first completion; a replay never changes it |
+| created_at | timestamptz | |
+| updated_at | timestamptz | A repeat completion leaves the row untouched, so this matches created_at |
+
+#### course_positions
+
+| Column | Type | Notes |
+|---|---|---|
+| learner_id | text | Part of the primary key; references user |
+| course_id | text | Part of the primary key; matches the content files |
+| step_id | text | The last step the learner completed, overwritten on every completion. Lets a replay of a finished mission resume where it was left |
+| created_at | timestamptz | |
+| updated_at | timestamptz | |
+
+Mission status, the resume step, the steps that may be opened by URL and chapter
+progress are never stored: the server works them out from these two tables and the
+content bundle on every read.
 
 #### attempts
 
@@ -350,9 +371,9 @@ A small Node.js and Express application, grouped into six areas.
 |---|---|
 | Sign-in | Sends the one-time code by email, verifies it, and issues a secure token that keeps the learner signed in for 30 days |
 | Profile | Detective name, avatar and sound preference |
-| Progress | Saves progress, records chapter completion, and returns where a learner left off |
+| Progress | Records step completions and works out each mission's progress from them and the content bundle: status, where the learner left off, and chapter progress. The frontend displays it without calculating anything |
 | Attempts | Records every chapter and quiz submission, and syncs each row to the client's Google Sheet |
-| Saral | Passes questions to the AI provider with the course content, streams the reply back, applies usage limits, and refuses requests from quiz screens |
+| Saral | Passes questions to the AI provider with the course content, returns one complete reply, applies usage limits, and refuses requests from non-chapter steps |
 | Feedback | Stores chapter feedback and emails it on |
 
 ### Endpoints
@@ -368,12 +389,11 @@ learner's own data.
 | `POST /auth/signout` | Ends the session |
 | `GET /me` | Returns the current learner and their detective profile; called when the app opens |
 | `PUT /me/profile` | Saves the detective name, chosen avatar and sound preference |
-| `GET /progress` | Progress across both missions, used by the course selection screen |
-| `GET /progress/:courseId` | Progress within one mission, so a returning learner resumes where they stopped |
-| `PUT /progress/:courseId/current-step` | Records the learner moving forward as they complete steps |
-| `POST /progress/:courseId/complete` | Marks a mission finished when the learner reaches the ending |
+| `GET /progress` | Progress across every mission, worked out on the server from completions and the content bundle: status, resume step, the steps that may be opened by URL and chapter progress. Used by the course selection screen |
+| `GET /progress/:courseId` | The same for one mission, so a returning learner resumes where they stopped |
+| `PUT /progress/:courseId/steps/:stepId` | Records that the learner completed a step (moving forward, or reaching the ending). Steps not in the content are refused |
 | `POST /attempts` | Records one chapter or quiz submission and queues it for the attempt log |
-| `POST /saral/chat` | Sends a question to Saral and streams the reply back; refused on quiz screens |
+| `POST /saral/chat` | Sends a question to Saral and returns one complete reply; refused on non-chapter steps |
 | `POST /feedback` | Saves chapter feedback and sends it on by email |
 | `GET /health` | Confirms the application is running; used for uptime checks |
 

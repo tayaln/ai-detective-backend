@@ -1,0 +1,13 @@
+{
+  "id": "demo",
+  "title": "Demo mission (test fixture)",
+  "steps": [
+    { "id": "demo-briefing", "type": "briefing" },
+    { "id": "demo-ch-1", "type": "chapter" },
+    { "id": "demo-story-1", "type": "story" },
+    { "id": "demo-ch-2", "type": "chapter" },
+    { "id": "demo-quiz-1", "type": "quiz" },
+    { "id": "demo-ch-3", "type": "chapter" },
+    { "id": "demo-ending", "type": "ending" }
+  ]
+}

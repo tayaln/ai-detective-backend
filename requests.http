@@ -1,0 +1,322 @@
+# requests.http — manual API collection, one request per endpoint, in the
+# order a learner meets them. Every task that adds an endpoint adds its
+# request here in the same change.
+#
+# Written for the VS Code REST Client extension (humao.rest-client). The
+# bearer token is captured from the verify response into @token, so it is
+# never copied by hand.
+#
+# Before you start:
+#   npm run seed   two known learners; learner.one is partway through mission 1
+#   npm run dev    with EMAIL_MODE unset, so codes print in this terminal
+#
+# Then run top to bottom. After "Request a code", copy the 6-digit code from
+# the `npm run dev` terminal into @otp, then run "Verify the code".
+
+@baseUrl = http://localhost:3000/api
+@email = learner.one@example.test
+@otp = 000000
+@token = {{verify.response.headers.set-auth-token}}
+
+###
+# Health check. No sign-in needed.
+# Good: 200 {"status":"ok","uptimeSeconds":…,"database":"ok"}.
+# 503 SERVICE_UNAVAILABLE means the database cannot be reached.
+GET {{baseUrl}}/health
+
+###
+# Sign in, step 1 — request a one-time code for @email.
+# Good: 200 {"success":true}, and the code appears in the dev server terminal
+# (EMAIL_MODE=console). Limited to 3 per email and 20 per IP every 15 minutes.
+POST {{baseUrl}}/auth/otp/request
+Content-Type: application/json
+
+{ "email": "{{email}}" }
+
+###
+# Sign in, step 2 — verify the code in @otp. Creates the learner and an empty
+# profile on first sign-in; seeded learners sign in to their existing account.
+# Good: 200 {"token":"…"} with the same token in the set-auth-token header,
+# which fills @token. A wrong code is 400 INVALID_CODE; the fourth wrong try is
+# INVALID_CODE_LAST_ATTEMPT and the fifth locks the code (TOO_MANY_ATTEMPTS).
+# Each code works once.
+# @name verify
+POST {{baseUrl}}/auth/otp/verify
+Content-Type: application/json
+
+{ "email": "{{email}}", "otp": "{{otp}}" }
+
+###
+# The signed-in learner and their profile in one response. Stamps last_seen_at.
+# Good: 200 {"learner":{"id","email","createdAt"},"profile":{"detectiveName",
+# "avatarId","soundOn","lastSeenAt"}}. For learner.one: Detective Asha, female-1.
+GET {{baseUrl}}/me
+Authorization: Bearer {{token}}
+
+###
+# The same call without a token.
+# Good: 401 {"status":401,"code":"UNAUTHENTICATED",…,"requestId":"…"}.
+GET {{baseUrl}}/me
+
+###
+# Create the detective identity, once, from the identity setup screen.
+# The seeded learners already have one, so for a 201 set @email to a new
+# address (e.g. new.detective@example.test) and sign in again first.
+# Good: 201 {"profile":{"detectiveName":"Detective Meera","avatarId":"female-2",
+# "soundOn":true,…}}. The name is stored trimmed, and soundOn is ignored here —
+# sound always starts on. An unknown avatarId or a blank name is 400 INVALID_INPUT.
+POST {{baseUrl}}/me/profile
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "detectiveName": "  Detective Meera  ", "avatarId": "female-2", "soundOn": false }
+
+###
+# Create again. The identity is set once.
+# Good: 409 CONFLICT, and the profile is unchanged.
+POST {{baseUrl}}/me/profile
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "detectiveName": "Someone Else", "avatarId": "male-1" }
+
+###
+# Turn the celebration sound off. Only soundOn changes.
+# Good: 200 {"profile":{…,"soundOn":false}} with name and avatar as before.
+# 404 NOT_FOUND if this learner has not created their identity yet.
+PUT {{baseUrl}}/me/profile
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "soundOn": false }
+
+###
+# Change only the name.
+# Good: 200 with the new name; avatar and soundOn unchanged.
+PUT {{baseUrl}}/me/profile
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "detectiveName": "Detective Kabir" }
+
+###
+# Change all three.
+# Good: 200 with every field updated.
+PUT {{baseUrl}}/me/profile
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "detectiveName": "Detective Asha", "avatarId": "male-2", "soundOn": true }
+
+###
+# An empty update.
+# Good: 400 INVALID_INPUT ("send at least one field").
+PUT {{baseUrl}}/me/profile
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{}
+
+###
+# An unknown avatar and a 25-character name.
+# Good: 400 INVALID_INPUT naming both fields; nothing changes.
+PUT {{baseUrl}}/me/profile
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "detectiveName": "Detective Abcdefghijklmno", "avatarId": "robot-9" }
+
+###
+# Create without a token.
+# Good: 401 UNAUTHENTICATED.
+POST {{baseUrl}}/me/profile
+Content-Type: application/json
+
+{ "detectiveName": "Detective Meera", "avatarId": "female-2" }
+
+###
+# Update without a token.
+# Good: 401 UNAUTHENTICATED.
+PUT {{baseUrl}}/me/profile
+Content-Type: application/json
+
+{ "soundOn": false }
+
+###
+# Progress for every mission in the content, worked out on the server: status,
+# resume step, the steps that may be opened by URL, chapter counts and per-chapter states.
+# Good: 200 {"courses":[{"courseId":"search-agent","status":"in-progress",
+# "resumeStepId":"sa-ch-4-give-the-ai-a-task","reachableStepIds":[…through "sa-quiz-1"],
+# "completedChapters":4,"totalChapters":12,"chapters":[{"stepId":…,"state":
+# "complete"|"current"|"empty"}],"completedStepIds":[…]}, …]}. Missions never
+# started are included as "not-started". Values shown are for seeded learner.one.
+GET {{baseUrl}}/progress
+Authorization: Bearer {{token}}
+
+###
+# One mission's progress, the same shape as one entry above.
+# Good: 200 {"courseId":"search-agent","status":…,"resumeStepId":…}. A mission
+# never started is 200 with status "not-started", not a 404.
+GET {{baseUrl}}/progress/search-agent
+Authorization: Bearer {{token}}
+
+###
+# A mission that is not in the content.
+# Good: 404 NOT_FOUND.
+GET {{baseUrl}}/progress/no-such-mission
+Authorization: Bearer {{token}}
+
+###
+# Mark a step complete as the learner moves forward (and on reaching the
+# ending). No body. Set once: send it twice and the second call still succeeds
+# but leaves the original completedAt unchanged.
+# Good: 200 with the mission's progress after the completion, the same shape as
+# GET /progress/:courseId. An id over 100 characters is 400 INVALID_INPUT.
+PUT {{baseUrl}}/progress/search-agent/steps/sa-quiz-1
+Authorization: Bearer {{token}}
+
+###
+# A step that is not in that mission's content. Nothing is stored.
+# Good: 404 NOT_FOUND.
+PUT {{baseUrl}}/progress/search-agent/steps/no-such-step
+Authorization: Bearer {{token}}
+
+###
+# Progress without a token.
+# Good: 401 UNAUTHENTICATED (the same for both GETs).
+PUT {{baseUrl}}/progress/search-agent/steps/sa-quiz-1
+
+###
+# Record a chapter code submission. Send it three times: attemptNumber goes
+# 1, 2, 3 for this learner and step. The attemptNumber and learnerId in the
+# body are ignored. The row then syncs to the sheet after the response, if
+# GOOGLE_SCRIPT_URL is set; check synced_at in the attempts table.
+# Good: 201 {"attemptNumber":1}. Limited to 30 per learner per minute.
+POST {{baseUrl}}/attempts
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "courseId": "1", "stepId": "ch-1", "stepType": "chapter", "submittedAnswer": "!pip install openai", "isCorrect": false, "attemptNumber": 99, "learnerId": "someone-else" }
+
+###
+# Record a quiz attempt: one row for the whole quiz, never one per question.
+# The summary is stored exactly as sent.
+# Good: 201 {"attemptNumber":1}; the row's submitted_answer matches byte for byte.
+POST {{baseUrl}}/attempts
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "courseId": "1", "stepId": "quiz-1", "stepType": "quiz", "submittedAnswer": "Mission 1 — Quiz 1\nQ1: What does pip do? → Installs packages ✓\nQ2: Which library? → openai ✓", "isCorrect": true, "score": 100 }
+
+###
+# An invalid attempt: unknown step type and a score over 100.
+# Good: 400 INVALID_INPUT naming both fields. An answer over 10,000 characters
+# is rejected the same way.
+POST {{baseUrl}}/attempts
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "courseId": "1", "stepId": "ch-1", "stepType": "story", "submittedAnswer": "x", "isCorrect": true, "score": 150 }
+
+###
+# Record an attempt without a token.
+# Good: 401 UNAUTHENTICATED.
+POST {{baseUrl}}/attempts
+Content-Type: application/json
+
+{ "courseId": "1", "stepId": "ch-1", "stepType": "chapter", "submittedAnswer": "x", "isCorrect": false }
+
+###
+# Leave feedback on a chapter. The shape matches the frontend's
+# feedback-schema.ts; its `learner` block and `sentAt` are ignored — the learner
+# comes from the session. The row is saved first, then the notification goes to
+# FEEDBACK_RECIPIENT_EMAIL after the response (printed in the dev terminal when
+# EMAIL_MODE=console). emailed_at is stamped only after a real Brevo send.
+# Good: 201 {"success":true}; the message is stored trimmed. A blank or
+# 2,001-character message is 400 INVALID_INPUT. Limited to 5 per learner per hour.
+POST {{baseUrl}}/feedback
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "message": "  The hint in this chapter pointed me to the wrong library name.  ",
+  "learner": { "id": "ignored", "email": "ignored@example.test", "detectiveName": null },
+  "context": {
+    "courseId": "1",
+    "missionNumber": 1,
+    "missionTitle": "AI Search Agent",
+    "stepId": "ch-1",
+    "chapterNumber": 1,
+    "stepTitle": "Install the AI Toolkit",
+    "pageUrl": "http://localhost:5173/courses/1/chapters/1"
+  },
+  "sentAt": "2026-10-13T10:00:00.000Z"
+}
+
+###
+# Feedback without a token.
+# Good: 401 UNAUTHENTICATED.
+POST {{baseUrl}}/feedback
+Content-Type: application/json
+
+{ "message": "Hello", "context": { "courseId": "1", "missionNumber": 1, "missionTitle": "AI Search Agent", "stepId": "ch-1", "chapterNumber": 1, "stepTitle": null, "pageUrl": "http://localhost:5173/courses/1/chapters/1" } }
+
+###
+# Ask Saral a question on a chapter step. Requires a signed-in learner.
+# The courseId and stepId must be a chapter in a loaded Saral block.
+# Good: 200 {"reply":"…"} — a Socratic hint, not the answer.
+# Limited to SARAL_DAILY_LIMIT messages per learner per day (default 20).
+POST {{baseUrl}}/saral/chat
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "courseId": "search-agent", "stepId": "sa-ch-1-install-ai-toolkit", "message": "How do I install the openai package?" }
+
+###
+# Ask Saral with a 1,001-character message — rejected.
+# Good: 400 INVALID_INPUT.
+POST {{baseUrl}}/saral/chat
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "courseId": "search-agent", "stepId": "sa-ch-1-install-ai-toolkit", "message": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaX" }
+
+###
+# Ask Saral on a quiz step — refused.
+# Good: 400 INVALID_INPUT ("Saral is only available on chapter steps.").
+POST {{baseUrl}}/saral/chat
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "courseId": "search-agent", "stepId": "sa-quiz-1", "message": "Help me with this quiz" }
+
+###
+# Ask Saral with an unknown step id — refused.
+# Good: 400 INVALID_INPUT.
+POST {{baseUrl}}/saral/chat
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "courseId": "search-agent", "stepId": "no-such-step", "message": "Hello" }
+
+###
+# Ask Saral without a token.
+# Good: 401 UNAUTHENTICATED.
+POST {{baseUrl}}/saral/chat
+Content-Type: application/json
+
+{ "courseId": "search-agent", "stepId": "sa-ch-1-install-ai-toolkit", "message": "Hello" }
+
+###
+# Sign out this device. Deletes this session only; other devices stay signed in.
+# Good: 200 {"success":true}. Also 200 with no token or one already signed out.
+POST {{baseUrl}}/auth/signout
+Authorization: Bearer {{token}}
+
+###
+# The signed-out token again.
+# Good: 401 UNAUTHENTICATED, even though the token string is unchanged.
+GET {{baseUrl}}/me
+Authorization: Bearer {{token}}
+
+###
