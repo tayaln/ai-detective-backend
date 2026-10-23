@@ -21,12 +21,19 @@ export type ErrorCode =
 export class AppError extends Error {
   readonly status: number;
   readonly code: ErrorCode;
+  readonly retryAfter?: string;
 
-  constructor(status: number, code: ErrorCode, message: string, options?: ErrorOptions) {
+  constructor(
+    status: number,
+    code: ErrorCode,
+    message: string,
+    options?: ErrorOptions & { retryAfter?: string },
+  ) {
     super(message, options);
     this.name = 'AppError';
     this.status = status;
     this.code = code;
+    this.retryAfter = options?.retryAfter;
   }
 }
 

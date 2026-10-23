@@ -76,6 +76,10 @@ export const errorHandler: ErrorRequestHandler = (err, req, res, _next) => {
     return;
   }
 
+  if (appError.retryAfter) {
+    res.set('Retry-After', appError.retryAfter);
+  }
+
   const body: ErrorResponse = {
     status: appError.status,
     code: appError.code,

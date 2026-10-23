@@ -51,6 +51,12 @@ const envSchema = z
     SARAL_DAILY_LIMIT: z.coerce.number().int().positive().default(20),
     // Max prior messages (both roles) replayed into each model call.
     SARAL_HISTORY_CAP: z.coerce.number().int().positive().default(20),
+    // Total attempts (including initial) for retryable Gemini errors (429).
+    SARAL_RETRY_ATTEMPTS: z.coerce.number().int().min(1).default(4),
+    // Initial backoff delay in seconds before the first retry.
+    SARAL_RETRY_BASE_DELAY: z.coerce.number().positive().default(1.0),
+    // Per-attempt timeout in seconds for each Gemini request.
+    SARAL_REQUEST_TIMEOUT: z.coerce.number().int().positive().default(12),
     // Where chapter feedback notifications go.
     FEEDBACK_RECIPIENT_EMAIL: z.email().optional(),
     // The Apps Script web app that appends attempt rows. A credential: whoever

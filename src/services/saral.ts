@@ -10,9 +10,18 @@ const ai = new GoogleGenAI({
   vertexai: true,
   project: config.GOOGLE_CLOUD_PROJECT,
   location: config.GOOGLE_CLOUD_LOCATION,
+  httpOptions: {
+    timeout: config.SARAL_REQUEST_TIMEOUT * 1000,
+    retryOptions: {
+      attempts: config.SARAL_RETRY_ATTEMPTS,
+      initialDelay: config.SARAL_RETRY_BASE_DELAY,
+      maxDelay: 8.0,
+      expBase: 2,
+      jitter: 1,
+      httpStatusCodes: [429],
+    },
+  },
 });
-
-const REQUEST_TIMEOUT_MS = 30_000;
 let loggedFirstCachedTokens = false;
 
 export async function chatWithSaral(
@@ -32,7 +41,7 @@ export async function chatWithSaral(
 
   const todayCount = await countTodayMessages(learnerId);
   if (todayCount >= config.SARAL_DAILY_LIMIT) {
-    throw new AppError(429, 'RATE_LIMITED', 'You have reached your daily question limit. Try again tomorrow.');
+    throw new AppError(429, 'RATE_LIMITED', 'You have reached your daily question limit. You can try again after 12:00 AM UTC (midnight).');
   }
 
   const course = getCourse(courseId);
@@ -79,7 +88,6 @@ export async function chatWithSaral(
         systemInstruction: block.systemPrompt,
         maxOutputTokens: 1024,
         thinkingConfig: { includeThoughts: false },
-        abortSignal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       },
     });
 
@@ -102,6 +110,23 @@ export async function chatWithSaral(
     }
   } catch (err) {
     if (err instanceof AppError) throw err;
+
+    const status = (err as { status?: number; statusCode?: number }).status
+      ?? (err as { statusCode?: number }).statusCode;
+
+    if (status === 429) {
+      const retryAfter =
+        (err as { headers?: { get?: (k: string) => string | null } }).headers?.get?.('retry-after')
+        ?? '30';
+      logger.warn({ learnerId, courseId, stepId }, 'Saral: all retries exhausted on 429');
+      throw new AppError(
+        503,
+        'SERVICE_UNAVAILABLE',
+        'The AI mentor is busy right now. Please try again in a moment.',
+        { cause: err, retryAfter },
+      );
+    }
+
     throw new AppError(
       502,
       'SERVICE_UNAVAILABLE',
