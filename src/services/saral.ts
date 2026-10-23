@@ -1,4 +1,5 @@
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenAI, type GenerateContentResponse } from '@google/genai';
+import { propagateAttributes, startActiveObservation } from '@langfuse/tracing';
 import { countTodayMessages, createSaralMessages, getRecentMessages } from '../db/saral.ts';
 import { config } from '../lib/config.ts';
 import { AppError } from '../lib/errors.ts';
@@ -22,7 +23,13 @@ const ai = new GoogleGenAI({
     },
   },
 });
+
+const MAX_OUTPUT_TOKENS = 1024;
 let loggedFirstCachedTokens = false;
+
+function replyText(response: GenerateContentResponse): string {
+  return response.candidates?.[0]?.content?.parts?.map((p) => p.text).join('') ?? '';
+}
 
 export async function chatWithSaral(
   learnerId: string,
@@ -81,20 +88,54 @@ export async function chatWithSaral(
   let cachedContentTokenCount: number | undefined;
 
   try {
-    const response = await ai.models.generateContent({
-      model: config.AI_MODEL,
-      contents,
-      config: {
-        systemInstruction: block.systemPrompt,
-        maxOutputTokens: 1024,
-        thinkingConfig: { includeThoughts: false },
+    const response = await propagateAttributes(
+      {
+        userId: learnerId,
+        sessionId: `${learnerId}:${courseId}`,
+        traceName: 'saral-chat',
+        metadata: {
+          courseId,
+          stepId,
+          lessonNumber: String(lessonNumber),
+          promptVersion: block.promptVersion,
+        },
       },
-    });
+      (): Promise<GenerateContentResponse> =>
+        startActiveObservation(
+          'gemini-generate',
+          async (generation) => {
+            generation.update({
+              model: config.AI_MODEL,
+              input: contents,
+              modelParameters: { maxOutputTokens: MAX_OUTPUT_TOKENS },
+            });
 
-    reply =
-      response.candidates?.[0]?.content?.parts
-        ?.map((p) => p.text)
-        .join('') ?? '';
+            const result = await ai.models.generateContent({
+              model: config.AI_MODEL,
+              contents,
+              config: {
+                systemInstruction: block.systemPrompt,
+                maxOutputTokens: MAX_OUTPUT_TOKENS,
+                thinkingConfig: { includeThoughts: false },
+              },
+            });
+
+            const usage = result.usageMetadata;
+            generation.update({
+              output: replyText(result),
+              usageDetails: {
+                input: usage?.promptTokenCount ?? 0,
+                output: usage?.candidatesTokenCount ?? 0,
+                cache_read_input_tokens: usage?.cachedContentTokenCount ?? 0,
+              },
+            });
+            return result;
+          },
+          { asType: 'generation' },
+        ),
+    );
+
+    reply = replyText(response);
 
     const usage = response.usageMetadata;
     promptTokenCount = usage?.promptTokenCount ?? undefined;
