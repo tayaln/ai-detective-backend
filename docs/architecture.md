@@ -329,6 +329,7 @@ content bundle on every read.
 | input_tokens | integer | AI usage |
 | output_tokens | integer | AI usage |
 | cached_tokens | integer | Shows the saving from prompt caching |
+| thinking_tokens | integer | Model thinking on Saral's replies: billed as output, not counted in output_tokens |
 | created_at | timestamptz | |
 
 **Notes**

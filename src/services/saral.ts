@@ -1,6 +1,11 @@
 import { GoogleGenAI, type GenerateContentResponse } from '@google/genai';
 import { propagateAttributes, startActiveObservation } from '@langfuse/tracing';
-import { countTodayMessages, createSaralMessages, getRecentMessages } from '../db/saral.ts';
+import {
+  completeExchange,
+  deleteSaralMessage,
+  getRecentMessages,
+  reserveUserMessage,
+} from '../db/saral.ts';
 import { config } from '../lib/config.ts';
 import { AppError } from '../lib/errors.ts';
 import { logger } from '../lib/logger.ts';
@@ -46,8 +51,15 @@ export async function chatWithSaral(
     throw new AppError(400, 'INVALID_INPUT', 'Saral is only available on chapter steps.');
   }
 
-  const todayCount = await countTodayMessages(learnerId);
-  if (todayCount >= config.SARAL_DAILY_LIMIT) {
+  // Read before the new message is saved, so it is not in the history twice.
+  const history = await getRecentMessages(learnerId, courseId);
+
+  const userMessageId = await reserveUserMessage(
+    learnerId,
+    { courseId, stepId, content: message },
+    config.SARAL_DAILY_LIMIT,
+  );
+  if (userMessageId === null) {
     throw new AppError(429, 'RATE_LIMITED', 'You have reached your daily question limit. You can try again after 12:00 AM UTC (midnight).');
   }
 
@@ -55,8 +67,6 @@ export async function chatWithSaral(
   const chapterSteps = course?.steps.filter((s) => s.type === 'chapter') ?? [];
   const chapterIndex = chapterSteps.findIndex((s) => s.id === stepId);
   const lessonNumber = chapterIndex + 1;
-
-  const history = await getRecentMessages(learnerId, courseId);
 
   const contents: { role: 'user' | 'model'; parts: { text: string }[] }[] = [
     {
@@ -86,6 +96,7 @@ export async function chatWithSaral(
   let promptTokenCount: number | undefined;
   let candidatesTokenCount: number | undefined;
   let cachedContentTokenCount: number | undefined;
+  let thoughtsTokenCount: number | undefined;
 
   try {
     const response = await propagateAttributes(
@@ -141,6 +152,7 @@ export async function chatWithSaral(
     promptTokenCount = usage?.promptTokenCount ?? undefined;
     candidatesTokenCount = usage?.candidatesTokenCount ?? undefined;
     cachedContentTokenCount = usage?.cachedContentTokenCount ?? undefined;
+    thoughtsTokenCount = usage?.thoughtsTokenCount ?? undefined;
 
     if (!loggedFirstCachedTokens) {
       loggedFirstCachedTokens = true;
@@ -150,6 +162,12 @@ export async function chatWithSaral(
       );
     }
   } catch (err) {
+    // No reply, so the message is neither counted nor replayed as history. A
+    // failed removal must not hide the model error, which is the one to report.
+    await deleteSaralMessage(userMessageId).catch((deleteErr: unknown) => {
+      logger.error({ err: deleteErr, learnerId, courseId, stepId }, 'Failed to remove unanswered Saral message');
+    });
+
     if (err instanceof AppError) throw err;
 
     const status = (err as { status?: number; statusCode?: number }).status
@@ -176,16 +194,10 @@ export async function chatWithSaral(
     );
   }
 
-  createSaralMessages(learnerId, [
-    {
-      courseId,
-      stepId,
-      role: 'user',
-      content: message,
-      inputTokens: promptTokenCount ?? null,
-      outputTokens: null,
-      cachedTokens: cachedContentTokenCount ?? null,
-    },
+  completeExchange(
+    learnerId,
+    userMessageId,
+    { inputTokens: promptTokenCount ?? null, cachedTokens: cachedContentTokenCount ?? null },
     {
       courseId,
       stepId,
@@ -194,8 +206,9 @@ export async function chatWithSaral(
       inputTokens: null,
       outputTokens: candidatesTokenCount ?? null,
       cachedTokens: null,
+      thinkingTokens: thoughtsTokenCount ?? null,
     },
-  ]).catch((err) => {
+  ).catch((err) => {
     logger.error({ err, learnerId, courseId, stepId }, 'Failed to store Saral exchange');
   });
 
