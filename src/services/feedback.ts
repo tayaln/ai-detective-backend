@@ -1,8 +1,7 @@
 import { createFeedback, markFeedbackEmailed, type NewFeedback } from '../db/feedback.ts';
 import { findLearnerContact } from '../db/learners.ts';
 import { config } from '../lib/config.ts';
-import { sendEmail } from '../lib/email.ts';
-import { feedbackEmail } from '../lib/feedback-email.ts';
+import { feedbackEmail, sendEmail } from '../lib/email.ts';
 import { logger } from '../lib/logger.ts';
 
 type SavedFeedback = Awaited<ReturnType<typeof createFeedback>>;

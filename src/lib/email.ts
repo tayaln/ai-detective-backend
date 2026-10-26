@@ -1,6 +1,7 @@
 import { config } from './config.ts';
 import { AppError } from './errors.ts';
 import { logger } from './logger.ts';
+import { formatIstShort } from './time.ts';
 
 export interface OutgoingEmail {
   to: string;
@@ -119,4 +120,96 @@ export function logEmailMode(): void {
   if (config.EMAIL_MODE_UNRECOGNISED) {
     logger.warn('EMAIL_MODE is not "live" or "console"; using console');
   }
+}
+
+const escapeHtml = (value: string) =>
+  value.replace(/[&<>"']/g, (char) => `&#${char.charCodeAt(0)};`);
+
+/**
+ * Short, with the code in the subject so it shows in the inbox list. Sent as HTML so the
+ * code can be bold and indented; the plain text (the code indented with spaces) is what
+ * the console prints when email stays local.
+ */
+export function signInCodeEmail(to: string, code: string, expiresInMinutes: number): OutgoingEmail {
+  const intro = 'Your AI Detective sign-in code:';
+  const lines = [
+    `This code expires in ${expiresInMinutes} minutes and can be used once.`,
+    "If you didn't try to sign in, you can ignore this email.",
+    'Never share this code. AI Detective will never ask you for it.',
+  ];
+  return {
+    to,
+    subject: `${code} is your AI Detective sign-in code`,
+    text: [intro, `    ${code}`, ...lines].join('\n\n'),
+    html: [
+      `<p>${escapeHtml(intro)}</p>`,
+      `<p style="padding-left:24px"><strong>${escapeHtml(code)}</strong></p>`,
+      ...lines.map((line) => `<p>${escapeHtml(line)}</p>`),
+    ].join('\n'),
+  };
+}
+
+export interface FeedbackNotice {
+  to: string;
+  learnerEmail: string;
+  detectiveName: string | null;
+  courseId: string;
+  missionNumber: number;
+  missionTitle: string;
+  stepId: string;
+  chapterNumber: number | null;
+  stepTitle: string | null;
+  pageUrl: string;
+  message: string;
+  receivedAt: Date;
+}
+
+/** One line of display text: client-supplied titles cannot break the subject or a header line. */
+function oneLine(text: string): string {
+  return text.replace(/\s+/g, ' ').trim();
+}
+
+/** Lines up the values of the details block: "Submitted:  " is the longest label. */
+function detail(label: string, value: string): string {
+  return `${`${label}:`.padEnd(12)}${value}`;
+}
+
+/**
+ * Plain text only, so nothing in the message is ever interpreted as markup.
+ * The subject names the mission and chapter so a full inbox stays scannable;
+ * the learner's words come first, the details under a rule, and replies go
+ * straight to the learner.
+ */
+export function feedbackEmail(notice: FeedbackNotice): OutgoingEmail {
+  const missionTitle = oneLine(notice.missionTitle);
+  const stepTitle = notice.stepTitle ? oneLine(notice.stepTitle) : null;
+  const stepName = stepTitle ?? notice.stepId;
+  const chapter =
+    notice.chapterNumber === null
+      ? stepName
+      : `Chapter ${notice.chapterNumber}${stepTitle ? ` · ${stepTitle}` : ''}`;
+  // "Mission 1 Ch2 — Read the AI's Response"; a step that is not a chapter has no "ChN".
+  const subjectStep =
+    notice.chapterNumber === null
+      ? `Mission ${notice.missionNumber} — ${stepName}`
+      : `Mission ${notice.missionNumber} Ch${notice.chapterNumber} — ${stepName}`;
+  const name = notice.detectiveName ? oneLine(notice.detectiveName) : null;
+
+  return {
+    to: notice.to,
+    replyTo: notice.learnerEmail,
+    subject: `Feedback · ${subjectStep}`,
+    text: [
+      `Feedback: ${notice.message}`,
+      '',
+      '———',
+      detail('Learner', name ? `${name} (${notice.learnerEmail})` : notice.learnerEmail),
+      detail('Mission', `Mission ${notice.missionNumber} · ${missionTitle} (${notice.courseId})`),
+      detail('Chapter', `${chapter} (${notice.stepId})`),
+      detail('Submitted', formatIstShort(notice.receivedAt)),
+      detail('Page', oneLine(notice.pageUrl)),
+      '',
+      'Reply to this email to answer the learner directly.',
+    ].join('\n'),
+  };
 }

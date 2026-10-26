@@ -138,8 +138,8 @@ No code is executed, so nothing can run on the server or in the browser.
 
 ### Mentor Saral
 
-- **Context:** supplied Saral content blocks, one per mission, loaded from a configured path at startup. Each chapter carries its id, title, task and starter code. Chapter instructions, quizzes, solutions, `saralNotes` and the ending step are excluded.
-- **Personality:** supplied as a separate text file, placed first in the system instruction. It governs voice and tone only; behavioural rules sit after it and take precedence.
+- **Context:** three text files in `SARAL_BLOCK_PATH`, loaded once at startup: `system-prompt.txt` (shared by every mission), then `<courseId>.content.txt` and `<courseId>.code.txt` (per mission), joined in that order into one system instruction per mission. A mission whose files have no matching course in the content bundle stops startup.
+- **Personality:** voice and tone are written inside `system-prompt.txt`; there is no separate personality file.
 - **Optimisation:** the system instruction block is byte-identical for every learner, so per-learner trimming is never applied. Gemini's implicit context caching reduces cost for repeated prefixes.
 - **Interaction:** Socratic-first approach — the first reply to a question is a leading question or a hint, never an explanation that resolves it.
 - **Answer handling:** Saral has no solutions and no quiz answers. When asked for the answer it says so honestly and offers a stronger hint.

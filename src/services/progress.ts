@@ -7,7 +7,7 @@ import {
   missionState,
   reachableSteps,
   resolveResumeStep,
-} from '../lib/progress-rules.ts';
+} from './progress-rules.ts';
 
 // Completions are the stored facts; everything the learner sees about their
 // progress is worked out here from those and the course content, so the

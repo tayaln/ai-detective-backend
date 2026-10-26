@@ -3,8 +3,7 @@ import { z } from 'zod';
 import { PRESET_AVATAR_IDS } from '../lib/config.ts';
 import { learnerIdOf, requireLearner } from '../middleware/require-learner.ts';
 import { validate } from '../middleware/validate.ts';
-import { getMe } from '../services/me.ts';
-import { createProfile, updateProfile } from '../services/profile.ts';
+import { createProfile, getMe, updateProfile } from '../services/profile.ts';
 
 // Plain text, never markup: it is shown in the header and goes into Saral's prompt.
 const detectiveName = z.string().trim().min(1).max(24);
