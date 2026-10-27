@@ -4,9 +4,7 @@
   "private": true,
   "description": "API for AI Detective, a story-driven app that teaches learners to build an AI agent.",
   "type": "module",
-  "engines": {
-    "node": ">=24"
-  },
+  "engines": { "node": ">=24.22.1" },
   "scripts": {
     "dev": "node --watch --env-file-if-exists=.env src/index.ts",
     "build": "tsc",
