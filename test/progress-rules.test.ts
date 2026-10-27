@@ -8,7 +8,7 @@ import {
   reachableSteps,
   resolveResumeStep,
   type StepRef,
-} from '../src/lib/progress-rules.ts';
+} from '../src/services/progress-rules.ts';
 
 const STEPS: StepRef[] = [
   { id: 'briefing', type: 'briefing' },

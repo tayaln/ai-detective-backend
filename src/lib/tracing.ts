@@ -1,9 +1,11 @@
 import { LangfuseSpanProcessor } from '@langfuse/otel';
-import { NodeTracerProvider } from '@opentelemetry/sdk-trace-node';
+import { context, trace } from '@opentelemetry/api';
+import { AsyncLocalStorageContextManager } from '@opentelemetry/context-async-hooks';
+import { TracerProvider } from '@opentelemetry/sdk-trace';
 import { config } from './config.ts';
 import { logger } from './logger.ts';
 
-let provider: NodeTracerProvider | undefined;
+let provider: TracerProvider | undefined;
 
 export function isTracingEnabled(): boolean {
   return config.LANGFUSE_PUBLIC_KEY !== undefined && config.LANGFUSE_SECRET_KEY !== undefined;
@@ -21,7 +23,7 @@ export function startTracing(): void {
 
   // Spans are batched and sent in the background, so a slow or unreachable
   // Langfuse never holds up a Saral reply.
-  provider = new NodeTracerProvider({
+  provider = new TracerProvider({
     spanProcessors: [
       new LangfuseSpanProcessor({
         publicKey: config.LANGFUSE_PUBLIC_KEY,
@@ -31,7 +33,10 @@ export function startTracing(): void {
       }),
     ],
   });
-  provider.register();
+  // The context manager carries the active trace across awaits, so Saral's
+  // generation nests under its trace with the learner and session attached.
+  context.setGlobalContextManager(new AsyncLocalStorageContextManager().enable());
+  trace.setGlobalTracerProvider(provider);
   logger.info({ baseUrl: config.LANGFUSE_BASE_URL }, 'Langfuse tracing: on');
 }
 

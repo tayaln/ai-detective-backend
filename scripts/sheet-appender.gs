@@ -53,7 +53,7 @@ function doPost(e) {
     data.correct ? 'Yes' : 'No',
     data.score === null || data.score === undefined ? '' : data.score,
     data.submittedAnswer,
-  ];
+  ].map(asText);
 
   // Two attempts arriving together must not write to the same row.
   var lock = LockService.getScriptLock();
@@ -69,8 +69,8 @@ function doPost(e) {
     }
     var sheet = attemptsSheet();
     var range = sheet.getRange(sheet.getLastRow() + 1, 1, 1, row.length);
-    // Plain text, so a learner's code or name starting with "=" is never run
-    // as a formula and every value lands exactly as sent.
+    // Plain text, so numbers and dates are not reformatted. This alone does not
+    // stop a formula: setValues still evaluates one, which asText prevents.
     range.setNumberFormat('@');
     range.setValues([row]);
     if (cacheKey) {
@@ -80,6 +80,19 @@ function doPost(e) {
     lock.releaseLock();
   }
   return reply({ ok: true });
+}
+
+/**
+ * A string that Sheets would read as a formula gets a leading apostrophe, which
+ * Sheets hides and which makes the cell text. A learner's answer starting with
+ * "=", "+", "-" or "@" could otherwise plant a link or fetch an outside URL.
+ * The database keeps the text exactly as sent.
+ */
+function asText(value) {
+  if (typeof value === 'string' && /^[=+\-@\t\r]/.test(value)) {
+    return "'" + value;
+  }
+  return value;
 }
 
 function attemptsSheet() {

@@ -48,6 +48,8 @@ export const auth = betterAuth({
         throw new Error('Sign-in codes are sent by services/auth.ts, not this hook');
       },
     }),
-    bearer(),
+    // Only the signed token we issue is accepted; the bare session token, which
+    // is stored in plain text in the session table, is refused.
+    bearer({ requireSignature: true }),
   ],
 });

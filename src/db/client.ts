@@ -7,6 +7,9 @@ const adapter = new PrismaPg({
   // pg waits forever for a connection by default; fail fast instead so
   // requests and the health check error out when the database is down.
   connectionTimeoutMillis: 5_000,
+  // Prisma sends dates without an offset, so Postgres reads them in the
+  // session timezone. Pin it to UTC whatever the server's default is.
+  options: '-c timezone=UTC',
 });
 
 /** The one Prisma client for the whole application. */

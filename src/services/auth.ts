@@ -1,14 +1,13 @@
 import { APIError } from 'better-auth/api';
-import { deleteVerification } from '../db/verifications.ts';
+import { deleteVerification } from '../db/auth.ts';
 import {
   auth,
   AUTH_TOKEN_HEADER,
   OTP_ALLOWED_ATTEMPTS,
   OTP_EXPIRES_IN_MINUTES,
 } from '../lib/auth.ts';
-import { assertEmailCapacity, sendEmail } from '../lib/email.ts';
+import { assertEmailCapacity, sendEmail, signInCodeEmail } from '../lib/email.ts';
 import { AppError } from '../lib/errors.ts';
-import { signInCodeEmail } from '../lib/otp-email.ts';
 
 const TOO_MANY_ATTEMPTS_MESSAGE = 'Too many wrong attempts for this code. Request a new one.';
 

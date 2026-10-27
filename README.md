@@ -161,15 +161,15 @@ Client extension; the bearer token is captured from the verify response.
 
 ## Code layout
 
-| Folder           | Holds                                                            |
-| ---------------- | ---------------------------------------------------------------- |
-| `src/app`        | Express app assembly and the server with graceful shutdown       |
-| `src/routes`     | Thin route handlers: validate, call a service, return            |
-| `src/services`   | Business logic, one file per area                                |
-| `src/db`         | Database access, one file per area, and the shared Prisma client |
-| `src/middleware` | Request id and logging, validation, rate limiting, errors        |
-| `src/lib`        | Config, logger, the `AppError` class, Better Auth setup          |
-| `prisma`         | Schema and migrations                                            |
+| Folder           | Holds                                                                                                                                                                                            |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `src/app`        | Express app assembly and the server with graceful shutdown                                                                                                                                       |
+| `src/routes`     | Thin route handlers: validate, call a service, return                                                                                                                                            |
+| `src/services`   | Business logic, one file per area                                                                                                                                                                |
+| `src/db`         | Database access, one file per area, and the shared Prisma client                                                                                                                                 |
+| `src/middleware` | Request id and logging, validation, rate limiting, errors                                                                                                                                        |
+| `src/lib`        | Config, logger, the `AppError` class, Better Auth setup, and infrastructure: content and Saral prompt loading, email (Brevo transport and templates), Google Sheet sync, tracing, IST formatting |
+| `prisma`         | Schema and migrations                                                                                                                                                                            |
 
 Every error response has the same shape, and its `requestId` matches the
 `X-Request-Id` header and the log line for that request:

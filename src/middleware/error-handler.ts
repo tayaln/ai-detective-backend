@@ -70,7 +70,7 @@ export const errorHandler: ErrorRequestHandler = (err, req, res, _next) => {
   );
   res.locals.errorLogged = true;
 
-  // A streamed response has already started, so the status line cannot change.
+  // The response was already sent (an error after res.json), so the status line cannot change.
   if (res.headersSent) {
     res.end();
     return;
