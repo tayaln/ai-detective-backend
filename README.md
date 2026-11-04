@@ -16,11 +16,14 @@ both are served from one domain: the site at `/`, this API at `/api`.
 | Database | PostgreSQL 18 via Prisma                     |
 | Auth     | Better Auth — email OTP and bearer plugins   |
 | Email    | Brevo                                        |
-| AI       | LLM provider with streaming replies          |
+| AI       | Google Gemini on Vertex AI, single response  |
+| Tracing  | Langfuse (OpenTelemetry), Saral only, optional |
 | Hosting  | Single Google Cloud VM, Mumbai, behind nginx |
 
-Express, Prisma and Better Auth are installed, the full database schema is
-migrated, and email one-time-code sign-in works end to end.
+Email one-time-code sign-in, the learner profile, progress and attempt
+tracking, chapter feedback, and the AI mentor Saral are all built and work end
+to end. Replies from Saral arrive in one complete response — there is no
+streaming anywhere in the system.
 
 ## Running locally from a fresh clone
 
@@ -52,14 +55,19 @@ client to `src/generated/prisma` (gitignored).
 cp .env.example .env
 ```
 
-Fill in the values you need. `.env` is gitignored, so never commit it. To start
-the server you need at least `NODE_ENV=development`, `PORT=3000`,
-`LOG_DIR=logs` and `CORS_ORIGINS=http://localhost:5173` (the Vite dev server).
-If a required variable is missing or malformed, the server refuses to start
-and names it. Leave
-`EMAIL_MODE` unset or set it to `console` locally. That prints emails to the
-terminal instead of sending them, because the Brevo daily limit is shared with
-production.
+`.env.example` lists every variable, grouped and commented; fill in the ones
+you need and never commit `.env` (it is gitignored). To start the server you
+need at least `NODE_ENV`, `PORT`, `LOG_DIR`, `DATABASE_URL`,
+`BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, `CONTENT_BUNDLE_PATH`, and — for the
+AI mentor — `GOOGLE_CLOUD_PROJECT`, `AI_MODEL` and `SARAL_BLOCK_PATH`. Set
+`CORS_ORIGINS=http://localhost:5173` for the Vite dev server. If a required
+variable is missing or malformed, the server refuses to start and names it.
+Leave `EMAIL_MODE` unset or set it to `console` locally. That prints emails to
+the terminal instead of sending them, because the Brevo daily limit is shared
+with production. Saral calls Vertex AI with Application Default Credentials, so
+`gcloud auth application-default login` must have run for the `GOOGLE_CLOUD_PROJECT`.
+Langfuse tracing is optional: leave `LANGFUSE_PUBLIC_KEY` and
+`LANGFUSE_SECRET_KEY` unset to turn it off.
 
 ### 4. Database
 
@@ -129,7 +137,7 @@ npm run build       # compile to dist/
 | `npm run db:migrate`   | Create and apply migrations (dev)                    |
 | `npm run db:studio`    | Open Prisma Studio                                   |
 | `npm run seed`         | Recreate the two test learners (never in production) |
-| `npm test`             | Run the one-time code rule tests                     |
+| `npm test`             | Run the one-time code and progress rule tests        |
 | `npm run typecheck`    | Type-check without emitting                          |
 | `npm run lint`         | Lint with ESLint (type-aware)                        |
 | `npm run lint:fix`     | Lint and apply automatic fixes                       |
@@ -149,12 +157,13 @@ It is safe to run repeatedly: it deletes those two learners (and everything
 that cascades from them) and recreates them, and never touches anyone else.
 It refuses to run when `NODE_ENV` is `production`.
 
-`npm test` runs the one-time code rules with Node's built-in test runner:
-expiry after 10 minutes, single use, locking after 5 wrong attempts, and a new
-code replacing the old one. The clock is mocked, so the suite takes about a
-second. The test setup forces `EMAIL_MODE=console` and disables network
-access, whatever `.env` says. Tests use the database in `DATABASE_URL` and
-remove what they create.
+`npm test` runs the targeted suites with Node's built-in test runner. The
+one-time code rules: expiry after 10 minutes, single use, locking after 5
+wrong attempts, and a new code replacing the old one (the clock is mocked, so
+these do not wait in real time). The progress rules both on their own and end
+to end against a real app on a local port with real bearer tokens. The test
+setup forces `EMAIL_MODE=console` and disables network access, whatever `.env`
+says. Tests use the database in `DATABASE_URL` and remove what they create.
 
 `requests.http` walks the API in learner-journey order with the VS Code REST
 Client extension; the bearer token is captured from the verify response.
@@ -184,6 +193,4 @@ Logs rotate at 10 MB and the ten most recent files are kept.
 
 - `CLAUDE.md` — the project guide: non-negotiables, conventions, security rules
 - `docs/architecture.md` — system design, data model, endpoint list
-- `tasks/` — numbered task files, starting at 201. Each one has a goal, scope,
-  acceptance criteria and constraints.
 - `requests.http` — one request per endpoint, in learner-journey order

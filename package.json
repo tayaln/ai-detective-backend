@@ -1,6 +1,6 @@
 {
   "name": "ai-detective-backend",
-  "version": "0.1.0",
+  "version": "1.0.1",
   "private": true,
   "description": "API for AI Detective, a story-driven app that teaches learners to build an AI agent.",
   "type": "module",
@@ -22,7 +22,8 @@
   },
   "overrides": {
     "deepmerge-ts": "8.0.2",
-    "mysql2": "3.24.6"
+    "mysql2": "3.24.6",
+    "minimatch": "^11.0.1"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

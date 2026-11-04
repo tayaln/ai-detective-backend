@@ -21,6 +21,7 @@ Read the relevant one before changing anything structural.
 | Auth | Better Auth — email OTP plugin, bearer plugin |
 | Email | Brevo |
 | AI | Google Gemini on Vertex AI via GCP project, ADC auth, single response |
+| Tracing | Langfuse (OpenTelemetry), Saral only, optional |
 | Hosting | Single Google Cloud VM, Mumbai, behind nginx |
 
 The frontend is a separate repository (React, Vite, TypeScript). Both are
@@ -165,11 +166,13 @@ during quizzes, story steps, or the ending. The endpoint refuses any step
 that is not a chapter. Replies arrive in one complete response; there is no
 streaming anywhere in the system.
 
-- The prompt is five supplied text files in `SARAL_BLOCK_PATH`:
+- The prompt is three supplied text files in `SARAL_BLOCK_PATH`:
   `system-prompt.txt` (shared), `<courseId>.content.txt` (per mission),
   `<courseId>.code.txt` (per mission). Loaded once at startup, concatenated
   in that order into one system instruction per mission. No prompt text is
-  hardcoded in source — the files are the only source.
+  hardcoded in source — the files are the only source. A short hash of the
+  assembled block (`promptVersion`) is attached to each trace so it is clear
+  which prompt text produced a reply.
 - The assembled block is byte-identical for every learner. Per-learner
   trimming would destroy prompt caching. The shared prefix
   (`system-prompt.txt`) is as long as possible across missions.
@@ -179,15 +182,32 @@ streaming anywhere in the system.
 - Saral has no quiz answers. When asked for one it says so honestly and
   offers a stronger hint.
 - He must not discuss content from chapters ahead of the learner's position.
-- Conversation memory is the last 20 messages of the mission. The learner
-  sees only the current conversation, so Saral must never refer back to an
-  earlier message.
+- Conversation memory is the last `SARAL_HISTORY_CAP` messages of the mission
+  (default 20). The learner sees only the current conversation, so Saral must
+  never refer back to an earlier message.
 - Saral never sees the learner's code. If the problem depends on what they
   wrote, Saral asks them to describe or paste it.
-- Learner messages are capped at 1,000 characters and replies at 300 tokens.
+- Learner messages are capped at 1,000 characters and replies at 1,024 tokens
+  (`MAX_OUTPUT_TOKENS`).
+- Each learner may send `SARAL_DAILY_LIMIT` messages per day (default 20)
+  across all missions — this is the AI spend ceiling. The learner's message is
+  reserved (written, under a per-learner advisory lock) before the model is
+  called, so it counts towards the limit while the reply is pending; a reply
+  that never comes is removed so it is neither counted nor replayed. The
+  window resets at 00:00 UTC.
+- Transient `429`s from Gemini are retried with exponential backoff
+  (`SARAL_RETRY_ATTEMPTS`, `SARAL_RETRY_BASE_DELAY`, `SARAL_REQUEST_TIMEOUT`).
+  When all retries are exhausted the endpoint returns `503`; other model
+  failures return `502`.
 - Every exchange is logged to `saral_messages` with its token counts,
   including cached tokens. `cached_content_token_count` is recorded on every
   exchange.
+- When Langfuse keys are set, every exchange is also traced to Langfuse: one
+  `saral-chat` trace per request with the learner and session attached, and a
+  nested `gemini-generate` generation carrying the model, input, output and
+  token usage. Spans are batched and exported in the background, so a slow or
+  unreachable Langfuse never delays a reply. With no keys the tracing calls are
+  no-ops. The secret key is a credential — `.env` only.
 - There is no endpoint that returns past messages. `saral_messages` exists to
   feed the model and for reporting; the client never reads it back.
 
@@ -217,8 +237,10 @@ request there in the same task that builds it.
 is repeatable.
 
 Targeted tests exist only where manual checking cannot reach: OTP expiry,
-single use and attempt locking; and ownership — that learner A cannot read or
-change learner B's data. Test setup forces `EMAIL_MODE=console`.
+single use and attempt locking; ownership — that learner A cannot read or
+change learner B's data; and the progress rules, both on their own
+(`progress-rules.test.ts`) and end to end against a real app and database
+(`progress.test.ts`). Test setup forces `EMAIL_MODE=console`.
 
 ---
 
